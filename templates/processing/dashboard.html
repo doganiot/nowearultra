@@ -21,27 +21,76 @@
         </div>
     </div>
 
-    <!-- Model Bilgileri -->
+    <!-- Model Bilgileri ve 3D Görüntüleyici -->
     <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="card shadow-sm">
+        <!-- Model Bilgileri -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0"><i class="fas fa-info-circle"></i> Model Bilgileri</h5>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-4">
-                            <p><strong>Dosya Adı:</strong> {{ model.name }}</p>
-                            <p><strong>Yüklenme Tarihi:</strong> {{ model.uploaded_at|date:"d F Y, H:i" }}</p>
-                        </div>
-                        <div class="col-md-4">
-                            <p><strong>Dosya Boyutu:</strong> {{ model.file_size|filesizeformat }}</p>
-                            <p><strong>Format:</strong> {{ model.file_format|upper }}</p>
-                        </div>
-                        <div class="col-md-4">
-                            <p><strong>Durum:</strong> 
-                                <span class="badge bg-success">Yüklenmiş</span>
-                            </p>
+                    <div class="mb-3">
+                        <label class="text-muted small">Dosya Adı</label>
+                        <p class="mb-0"><strong>{{ model.name }}</strong></p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-muted small">Yüklenme Tarihi</label>
+                        <p class="mb-0"><strong>{{ model.uploaded_at|date:"d F Y, H:i" }}</strong></p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-muted small">Dosya Boyutu</label>
+                        <p class="mb-0"><strong>{{ model.file_size|filesizeformat }}</strong></p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-muted small">Format</label>
+                        <p class="mb-0"><strong>{{ model.file_format|upper }}</strong></p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-muted small">Durum</label>
+                        <p class="mb-0">
+                            <span class="badge bg-success">
+                                <i class="fas fa-check-circle"></i> Yüklenmiş
+                            </span>
+                        </p>
+                    </div>
+                    {% if stats.total_steps > 0 %}
+                    <div class="mb-3">
+                        <label class="text-muted small">İşlem Sayısı</label>
+                        <p class="mb-0">
+                            <span class="badge bg-info">
+                                <i class="fas fa-tasks"></i> {{ stats.total_steps }} işlem yapıldı
+                            </span>
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 3D Görüntüleyici -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-cube"></i> Modelin Güncel Hali</h5>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-light btn-sm" id="resetView" title="Görünümü Sıfırla">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                        <button class="btn btn-light btn-sm" id="toggleWireframe" title="Wireframe">
+                            <i class="fas fa-border-all"></i>
+                        </button>
+                        <button class="btn btn-light btn-sm" id="fullscreenView" title="Tam Ekran">
+                            <i class="fas fa-expand"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0 position-relative">
+                    <div id="canvas-container" style="width: 100%; height: 400px; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);"></div>
+                    <div id="loading-indicator" class="position-absolute top-50 start-50 translate-middle text-white">
+                        <div class="text-center">
+                            <i class="fas fa-spinner fa-spin fa-3x mb-2"></i>
+                            <p>Model yükleniyor...</p>
                         </div>
                     </div>
                 </div>
@@ -294,6 +343,181 @@
         padding: 2px 6px;
         border-radius: 3px;
     }
+
+    #loading-indicator {
+        z-index: 10;
+        pointer-events: none;
+    }
 </style>
+
+<!-- Three.js Kütüphaneleri -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+
+<script>
+// 3D Görüntüleyici
+let scene, camera, renderer, controls, mesh;
+let isWireframe = false;
+let initialCameraPosition, initialControlsTarget;
+
+function init3DViewer() {
+    const container = document.getElementById('canvas-container');
+    const loadingIndicator = document.getElementById('loading-indicator');
+    
+    // Scene
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+    
+    // Camera
+    camera = new THREE.PerspectiveCamera(
+        45,
+        container.clientWidth / container.clientHeight,
+        0.1,
+        10000
+    );
+    
+    // Renderer
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    container.appendChild(renderer.domElement);
+    
+    // Controls
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.rotateSpeed = 0.8;
+    controls.zoomSpeed = 1.2;
+    
+    // Işıklar
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+    
+    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight1.position.set(1, 1, 1);
+    scene.add(directionalLight1);
+    
+    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+    directionalLight2.position.set(-1, -1, -1);
+    scene.add(directionalLight2);
+    
+    // Grid
+    const gridHelper = new THREE.GridHelper(200, 20, 0x444444, 0x222222);
+    scene.add(gridHelper);
+    
+    // Axes Helper
+    const axesHelper = new THREE.AxesHelper(50);
+    scene.add(axesHelper);
+    
+    // STL Yükle
+    const loader = new THREE.STLLoader();
+    loader.load(
+        '{{ model.original_file.url }}',
+        function(geometry) {
+            // Loading göstergesini gizle
+            loadingIndicator.style.display = 'none';
+            
+            // Geometriyi merkeze al
+            geometry.center();
+            geometry.computeVertexNormals();
+            
+            // Material
+            const material = new THREE.MeshPhongMaterial({
+                color: 0x00d4aa,
+                shininess: 100,
+                specular: 0x111111,
+                flatShading: false
+            });
+            
+            // Mesh oluştur
+            mesh = new THREE.Mesh(geometry, material);
+            scene.add(mesh);
+            
+            // Kamerayı modele göre ayarla
+            const box = new THREE.Box3().setFromObject(mesh);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            
+            camera.position.set(
+                center.x + maxDim * 1.5,
+                center.y + maxDim * 0.8,
+                center.z + maxDim * 1.5
+            );
+            camera.lookAt(center);
+            controls.target.copy(center);
+            controls.update();
+            
+            // Initial pozisyonları kaydet
+            initialCameraPosition = camera.position.clone();
+            initialControlsTarget = controls.target.clone();
+            
+            console.log('✅ Model başarıyla yüklendi');
+        },
+        function(progress) {
+            const percent = (progress.loaded / progress.total * 100).toFixed(0);
+            console.log(`Model yükleniyor: ${percent}%`);
+        },
+        function(error) {
+            console.error('Model yükleme hatası:', error);
+            loadingIndicator.innerHTML = '<div class="text-center"><i class="fas fa-exclamation-triangle fa-3x mb-2 text-warning"></i><p>Model yüklenemedi</p></div>';
+        }
+    );
+    
+    // Animasyon döngüsü
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+    }
+    animate();
+    
+    // Responsive
+    window.addEventListener('resize', onWindowResize, false);
+}
+
+function onWindowResize() {
+    const container = document.getElementById('canvas-container');
+    camera.aspect = container.clientWidth / container.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(container.clientWidth, container.clientHeight);
+}
+
+// Görünümü Sıfırla
+document.getElementById('resetView').addEventListener('click', function() {
+    if (initialCameraPosition && initialControlsTarget) {
+        camera.position.copy(initialCameraPosition);
+        controls.target.copy(initialControlsTarget);
+        controls.update();
+    }
+});
+
+// Wireframe Toggle
+document.getElementById('toggleWireframe').addEventListener('click', function() {
+    if (mesh) {
+        isWireframe = !isWireframe;
+        mesh.material.wireframe = isWireframe;
+        this.classList.toggle('active');
+    }
+});
+
+// Tam Ekran
+document.getElementById('fullscreenView').addEventListener('click', function() {
+    const container = document.getElementById('canvas-container');
+    if (container.requestFullscreen) {
+        container.requestFullscreen();
+    } else if (container.webkitRequestFullscreen) {
+        container.webkitRequestFullscreen();
+    } else if (container.msRequestFullscreen) {
+        container.msRequestFullscreen();
+    }
+});
+
+// Sayfayı yüklendiğinde görüntüleyiciyi başlat
+document.addEventListener('DOMContentLoaded', function() {
+    init3DViewer();
+});
+</script>
 {% endblock %}
 

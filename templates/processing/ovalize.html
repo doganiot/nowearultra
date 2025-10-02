@@ -90,6 +90,23 @@
                     <div id="canvas-container"></div>
                 </div>
             </div>
+
+            <!-- Bilgilendirme -->
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-info-circle"></i>
+                <strong>Ovalleştirme Nasıl Çalışır?</strong>
+                <ul class="mb-0 mt-2 small">
+                    <li><strong>Subdivision:</strong> Mesh'e daha fazla vertex eklenir</li>
+                    <li><strong>Smoothing:</strong> Yüzey yumuşatılır ve ovalleştirilir</li>
+                    <li><strong>Sonuç:</strong> Daha organik ve pürüzsüz bir form</li>
+                    <li><strong>Performans:</strong> Yüksek yoğunluk daha fazla sürer</li>
+                </ul>
+            </div>
+
+            <div class="alert alert-warning mt-3">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Uyarı:</strong> Ovalleştirme vertex sayısını 4x artırabilir. Büyük modellerde dikkatli kullanın!
+            </div>
         </div>
     </div>
 </div>
@@ -141,23 +158,52 @@ document.getElementById('ovalIntensity').addEventListener('input', e => {
     document.getElementById('intensityValue').textContent = e.target.value;
 });
 
+// Uygula - GERÇEKten ovalleştir!
 document.getElementById('applyOvalize').addEventListener('click', function() {
-    fetch('{% url "processing:save_step" model_id=model.id %}', {
+    const button = this;
+    const originalText = button.innerHTML;
+    
+    // Onay iste
+    if (!confirm('Bu işlem modeli gerçekten ovalleştirecek ve orijinal dosyayı değiştirecek.\n\n⚠️ Uyarı: Ovalleştirme vertex sayısını artırır (mesh subdivision).\n\nDevam etmek istiyor musunuz?')) {
+        return;
+    }
+    
+    // Butonu devre dışı bırak
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Ovalleştiriliyor...';
+    
+    const intensity = document.getElementById('ovalIntensity').value;
+    const region = document.getElementById('region').value;
+    const preserveEdges = document.getElementById('preserveEdges').checked;
+    
+    // API'ye gerçek ovalleştirme isteği gönder
+    fetch('{% url "processing:ovalize_model" model_id=model.id %}', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
         body: JSON.stringify({
-            step_type: 'ovalization',
-            parameters: {
-                intensity: document.getElementById('ovalIntensity').value,
-                region: document.getElementById('region').value,
-                preserve_edges: document.getElementById('preserveEdges').checked
-            }
+            intensity: intensity,
+            region: region,
+            preserve_edges: preserveEdges
         })
-    }).then(r => r.json()).then(d => {
-        if (d.success) {
-            alert('Ovalleştirme işlemi kaydedildi!');
-            window.location.href = '{% url "processing:processing_dashboard" model_id=model.id %}';
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Ovalleştirme işlemi başarıyla tamamlandı!\n\nModel daha yumuşak ve organik hale getirildi.');
+            window.location.href = data.redirect_url || '{% url "processing:processing_dashboard" model_id=model.id %}';
+        } else {
+            alert('❌ Hata: ' + data.error);
+            button.disabled = false;
+            button.innerHTML = originalText;
         }
+    })
+    .catch(error => {
+        alert('❌ Bir hata oluştu: ' + error);
+        button.disabled = false;
+        button.innerHTML = originalText;
     });
 });
 

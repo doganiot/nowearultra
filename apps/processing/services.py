@@ -150,6 +150,42 @@ class ModelProcessor:
             print(f"Delik doldurma hatası: {e}")
             return False
     
+    def ovalize_model(self, intensity=5, preserve_edges=True):
+        """
+        Modeli ovalleştir (subdivision + smoothing)
+        
+        Args:
+            intensity: Ovalleştirme yoğunluğu (1-10)
+            preserve_edges: Kenarları koru
+        
+        Returns:
+            bool: Başarılı/başarısız
+        """
+        try:
+            # Yoğunluğa göre subdivision sayısını hesapla
+            # Düşük yoğunluk = 1 subdivision, yüksek = 2 subdivision
+            subdivisions = 1 if intensity <= 5 else 2
+            
+            # Mesh'i subdivide et (daha fazla vertex ekler, daha yumuşak yapar)
+            self.mesh = self.mesh.subdivide()
+            
+            # İkinci subdivision gerekirse
+            if subdivisions == 2:
+                self.mesh = self.mesh.subdivide()
+            
+            # Smoothing uygula (Laplacian)
+            smoothing_iterations = max(5, int(intensity))
+            trimesh.smoothing.filter_laplacian(
+                self.mesh, 
+                iterations=smoothing_iterations
+            )
+            
+            return True
+            
+        except Exception as e:
+            print(f"Ovalleştirme hatası: {e}")
+            return False
+    
     def save_stl(self, output_path=None):
         """
         Modeli STL olarak kaydet

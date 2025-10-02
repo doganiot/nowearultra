@@ -309,6 +309,88 @@ def fill_holes(request, model_id):
 def ovalize_model(request, model_id):
     """Ovalleştirme"""
     model = get_object_or_404(Model3D, id=model_id)
+    
+    if request.method == 'POST':
+        try:
+            from .services import ModelProcessor
+            import time
+            import os
+            from django.core.files import File
+            
+            # Parametreleri al
+            data = json.loads(request.body)
+            intensity = int(data.get('intensity', 5))
+            region = data.get('region', 'all')
+            preserve_edges = data.get('preserve_edges', True)
+            
+            # İşleme başlama zamanı
+            start_time = time.time()
+            
+            # Model işlemcisini başlat
+            processor = ModelProcessor(model.original_file.path)
+            
+            # Ovalleştirme işlemini uygula
+            success = processor.ovalize_model(
+                intensity=intensity,
+                preserve_edges=preserve_edges
+            )
+            
+            if not success:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Ovalleştirme işlemi başarısız oldu'
+                }, status=400)
+            
+            # Ovalleştirilmiş modeli kaydet
+            temp_path = processor.save_stl()
+            
+            # ProcessingStep oluştur
+            step = ProcessingStep.objects.create(
+                model=model,
+                step_type='ovalization',
+                parameters={
+                    'intensity': intensity,
+                    'region': region,
+                    'preserve_edges': preserve_edges
+                },
+                execution_time=time.time() - start_time,
+                success=True
+            )
+            
+            # Dosyayı ProcessingStep'e kaydet
+            with open(temp_path, 'rb') as f:
+                step.result_file.save(
+                    f'ovalize_{model.id}_{step.id}.stl',
+                    File(f),
+                    save=True
+                )
+            
+            # Temp dosyayı sil
+            os.unlink(temp_path)
+            
+            # Orijinal model dosyasını güncelle
+            with open(step.result_file.path, 'rb') as f:
+                model.original_file.save(
+                    model.original_file.name,
+                    File(f),
+                    save=True
+                )
+            
+            messages.success(request, f'Ovalleştirme işlemi başarıyla tamamlandı! ({step.execution_time:.2f} saniye)')
+            
+            return JsonResponse({
+                'success': True,
+                'step_id': str(step.id),
+                'message': 'Model başarıyla ovalleştirildi ve kaydedildi',
+                'redirect_url': f'/processing/{model.id}/'
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+    
     return render(request, 'processing/ovalize.html', {'model': model})
 
 

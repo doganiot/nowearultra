@@ -1,0 +1,323 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}Model Döndürme - {{ model.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    #canvas-container {
+        width: 100%;
+        height: 500px;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        border-radius: 10px;
+        position: relative;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Başlık -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-sync-alt text-primary"></i> Model Döndürme</h2>
+                    <p class="text-muted mb-0">{{ model.name }}</p>
+                </div>
+                <a href="{% url 'processing:processing_dashboard' model_id=model.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Kontrol Paneline Dön
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Döndürme Kontrolleri -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-sliders-h"></i> Döndürme Ayarları</h5>
+                </div>
+                <div class="card-body">
+                    <form id="rotateForm">
+                        {% csrf_token %}
+                        
+                        <!-- X Ekseni -->
+                        <div class="mb-4">
+                            <label for="rotateX" class="form-label">
+                                <i class="fas fa-arrows-alt-h text-danger"></i> X Ekseni (Kırmızı)
+                                <span class="badge bg-danger ms-2" id="xValue">0°</span>
+                            </label>
+                            <input type="range" class="form-range" id="rotateX" min="0" max="360" value="0" step="1">
+                        </div>
+
+                        <!-- Y Ekseni -->
+                        <div class="mb-4">
+                            <label for="rotateY" class="form-label">
+                                <i class="fas fa-arrows-alt-v text-success"></i> Y Ekseni (Yeşil)
+                                <span class="badge bg-success ms-2" id="yValue">0°</span>
+                            </label>
+                            <input type="range" class="form-range" id="rotateY" min="0" max="360" value="0" step="1">
+                        </div>
+
+                        <!-- Z Ekseni -->
+                        <div class="mb-4">
+                            <label for="rotateZ" class="form-label">
+                                <i class="fas fa-compress text-primary"></i> Z Ekseni (Mavi)
+                                <span class="badge bg-primary ms-2" id="zValue">0°</span>
+                            </label>
+                            <input type="range" class="form-range" id="rotateZ" min="0" max="360" value="0" step="1">
+                        </div>
+
+                        <!-- Butonlar -->
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-primary btn-lg" id="applyRotation">
+                                <i class="fas fa-check"></i> Döndürmeyi Uygula
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="resetRotation">
+                                <i class="fas fa-undo"></i> Sıfırla
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Önizleme Alanı -->
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-eye"></i> Canlı Önizleme</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div id="canvas-container"></div>
+                </div>
+            </div>
+
+            <!-- Hızlı Ayarlar -->
+            <div class="card shadow-sm mt-3">
+                <div class="card-header bg-secondary text-white">
+                    <h6 class="mb-0"><i class="fas fa-bolt"></i> Hızlı Ayarlar</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <button class="btn btn-sm btn-outline-primary w-100" onclick="quickRotate(90, 0, 0)">
+                                X: 90°
+                            </button>
+                        </div>
+                        <div class="col-6">
+                            <button class="btn btn-sm btn-outline-success w-100" onclick="quickRotate(0, 90, 0)">
+                                Y: 90°
+                            </button>
+                        </div>
+                        <div class="col-6">
+                            <button class="btn btn-sm btn-outline-primary w-100" onclick="quickRotate(0, 0, 90)">
+                                Z: 90°
+                            </button>
+                        </div>
+                        <div class="col-6">
+                            <button class="btn btn-sm btn-outline-warning w-100" onclick="quickRotate(180, 0, 0)">
+                                X: 180°
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Three.js Kütüphaneleri -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+
+<script>
+let scene, camera, renderer, controls, mesh;
+let currentRotation = { x: 0, y: 0, z: 0 };
+
+// Three.js Kurulum
+function initViewer() {
+    const container = document.getElementById('canvas-container');
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+
+    camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 10000);
+    camera.position.set(0, 0, 100);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    container.appendChild(renderer.domElement);
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(1, 1, 1);
+    scene.add(directionalLight);
+
+    const gridHelper = new THREE.GridHelper(200, 20, 0x444444, 0x222222);
+    scene.add(gridHelper);
+
+    loadSTL();
+    animate();
+
+    window.addEventListener('resize', function() {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+}
+
+// STL Yükle
+function loadSTL() {
+    const loader = new THREE.STLLoader();
+    loader.load('{{ model.original_file.url }}', function(geometry) {
+        geometry.center();
+        
+        const material = new THREE.MeshPhongMaterial({
+            color: 0x00d4ff,
+            specular: 0x111111,
+            shininess: 200
+        });
+
+        mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        const box = new THREE.Box3().setFromObject(mesh);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fov = camera.fov * (Math.PI / 180);
+        let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
+        
+        camera.position.set(center.x, center.y, center.z + cameraZ);
+        camera.lookAt(center);
+        controls.target.copy(center);
+        controls.update();
+    });
+}
+
+// Animasyon
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+// Slider değerlerini güncelle ve modeli döndür
+document.getElementById('rotateX').addEventListener('input', function(e) {
+    const value = e.target.value;
+    document.getElementById('xValue').textContent = value + '°';
+    currentRotation.x = THREE.MathUtils.degToRad(value);
+    if (mesh) {
+        mesh.rotation.x = currentRotation.x;
+    }
+});
+
+document.getElementById('rotateY').addEventListener('input', function(e) {
+    const value = e.target.value;
+    document.getElementById('yValue').textContent = value + '°';
+    currentRotation.y = THREE.MathUtils.degToRad(value);
+    if (mesh) {
+        mesh.rotation.y = currentRotation.y;
+    }
+});
+
+document.getElementById('rotateZ').addEventListener('input', function(e) {
+    const value = e.target.value;
+    document.getElementById('zValue').textContent = value + '°';
+    currentRotation.z = THREE.MathUtils.degToRad(value);
+    if (mesh) {
+        mesh.rotation.z = currentRotation.z;
+    }
+});
+
+// Hızlı döndürme
+function quickRotate(x, y, z) {
+    document.getElementById('rotateX').value = x;
+    document.getElementById('rotateY').value = y;
+    document.getElementById('rotateZ').value = z;
+    document.getElementById('xValue').textContent = x + '°';
+    document.getElementById('yValue').textContent = y + '°';
+    document.getElementById('zValue').textContent = z + '°';
+    
+    currentRotation.x = THREE.MathUtils.degToRad(x);
+    currentRotation.y = THREE.MathUtils.degToRad(y);
+    currentRotation.z = THREE.MathUtils.degToRad(z);
+    
+    if (mesh) {
+        mesh.rotation.set(currentRotation.x, currentRotation.y, currentRotation.z);
+    }
+}
+
+// Sıfırla
+document.getElementById('resetRotation').addEventListener('click', function() {
+    quickRotate(0, 0, 0);
+});
+
+// Uygula - GERÇEKten döndür!
+document.getElementById('applyRotation').addEventListener('click', function() {
+    const button = this;
+    const originalText = button.innerHTML;
+    
+    const x = document.getElementById('rotateX').value;
+    const y = document.getElementById('rotateY').value;
+    const z = document.getElementById('rotateZ').value;
+    
+    // Onay iste
+    if (!confirm(`Bu işlem modeli gerçekten döndürecek ve orijinal dosyayı değiştirecek.\n\nDöndürme: X=${x}°, Y=${y}°, Z=${z}°\n\nDevam etmek istiyor musunuz?`)) {
+        return;
+    }
+    
+    // Butonu devre dışı bırak
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Döndürülüyor...';
+    
+    // API'ye gerçek döndürme isteği gönder
+    fetch('{% url "processing:rotate_model" model_id=model.id %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+            x_angle: x,
+            y_angle: y,
+            z_angle: z
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`✅ Döndürme işlemi başarıyla tamamlandı!\n\nX: ${x}°, Y: ${y}°, Z: ${z}°`);
+            window.location.href = data.redirect_url || '{% url "processing:processing_dashboard" model_id=model.id %}';
+        } else {
+            alert('❌ Hata: ' + data.error);
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        alert('❌ Bir hata oluştu: ' + error);
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+});
+
+// Viewer'ı başlat
+initViewer();
+</script>
+{% endblock %}
+

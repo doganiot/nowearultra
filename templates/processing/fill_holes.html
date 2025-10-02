@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}Delik Doldurma - {{ model.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    #canvas-container {
+        width: 100%;
+        height: 500px;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        border-radius: 10px;
+        position: relative;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Başlık -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-fill-drip text-warning"></i> Delik Doldurma</h2>
+                    <p class="text-muted mb-0">{{ model.name }}</p>
+                </div>
+                <a href="{% url 'processing:processing_dashboard' model_id=model.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Kontrol Paneline Dön
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kontroller -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-sliders-h"></i> Doldurma Ayarları</h5>
+                </div>
+                <div class="card-body">
+                    <form id="fillForm">
+                        {% csrf_token %}
+                        
+                        <!-- Delik Boyutu -->
+                        <div class="mb-4">
+                            <label for="holeSize" class="form-label">
+                                <i class="fas fa-arrows-alt"></i> Maksimum Delik Boyutu
+                                <span class="badge bg-warning ms-2" id="sizeValue">10mm</span>
+                            </label>
+                            <input type="range" class="form-range" id="holeSize" min="1" max="50" value="10" step="1">
+                            <div class="form-text">
+                                <small>Bu boyuttan küçük delikler doldurulacak</small>
+                            </div>
+                        </div>
+
+                        <!-- Doldurma Yöntemi -->
+                        <div class="mb-4">
+                            <label class="form-label"><i class="fas fa-brain"></i> Doldurma Yöntemi</label>
+                            <select class="form-select" id="fillMethod">
+                                <option value="convex">Convex Hull (Dışbükey)</option>
+                                <option value="mesh">Mesh İnterpol asyonu</option>
+                                <option value="plane">Düzlem Kapatma</option>
+                            </select>
+                        </div>
+
+                        <!-- Otomatik Tespit -->
+                        <div class="mb-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="autoDetect" checked>
+                                <label class="form-check-label" for="autoDetect">
+                                    <i class="fas fa-search"></i> Delikleri Otomatik Tespit Et
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Butonlar -->
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-warning btn-lg" id="applyFill">
+                                <i class="fas fa-fill"></i> Delikleri Doldur
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="resetFill">
+                                <i class="fas fa-undo"></i> Sıfırla
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Önizleme -->
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-eye"></i> Canlı Önizleme</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div id="canvas-container"></div>
+                </div>
+            </div>
+
+            <!-- Bilgi -->
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-info-circle"></i>
+                <strong>Bilgi:</strong> Delik doldurma işlemi modeldeki açıklıkları otomatik olarak tespit edip kapatır.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+
+<script>
+let scene, camera, renderer, controls, mesh;
+
+function initViewer() {
+    const container = document.getElementById('canvas-container');
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+
+    camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 10000);
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(renderer.domElement);
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const light = new THREE.DirectionalLight(0xffffff, 0.8);
+    light.position.set(1, 1, 1);
+    scene.add(light);
+    scene.add(new THREE.GridHelper(200, 20, 0x444444, 0x222222));
+
+    const loader = new THREE.STLLoader();
+    loader.load('{{ model.original_file.url }}', function(geometry) {
+        geometry.center();
+        const material = new THREE.MeshPhongMaterial({ color: 0xffa500, specular: 0x111111, shininess: 200 });
+        mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        const box = new THREE.Box3().setFromObject(mesh);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        camera.position.set(center.x, center.y, center.z + maxDim * 1.5);
+        camera.lookAt(center);
+        controls.target.copy(center);
+    });
+
+    animate();
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+document.getElementById('holeSize').addEventListener('input', function(e) {
+    document.getElementById('sizeValue').textContent = e.target.value + 'mm';
+});
+
+document.getElementById('applyFill').addEventListener('click', function() {
+    const holeSize = document.getElementById('holeSize').value;
+    const method = document.getElementById('fillMethod').value;
+    const autoDetect = document.getElementById('autoDetect').checked;
+    
+    // API'ye gönder
+    fetch('{% url "processing:save_step" model_id=model.id %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+            step_type: 'fill_holes',
+            parameters: {
+                max_hole_size: holeSize,
+                fill_method: method,
+                auto_detect: autoDetect
+            }
+        })
+    }).then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Delik doldurma işlemi kaydedildi!');
+            window.location.href = '{% url "processing:processing_dashboard" model_id=model.id %}';
+        }
+    });
+});
+
+initViewer();
+</script>
+{% endblock %}
+

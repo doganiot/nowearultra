@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}{{ model.name }} - Detay{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <a href="{% url 'models:model_list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Model Listesi
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-cube me-2"></i>{{ model.name }}
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <p class="mb-2">
+                            <i class="fas fa-file me-2 text-primary"></i>
+                            <strong>Format:</strong> <span class="badge bg-info">{{ model.file_format|upper }}</span>
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-2">
+                            <i class="fas fa-weight me-2 text-primary"></i>
+                            <strong>Boyut:</strong> {{ model.file_size|filesizeformat }}
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <p class="mb-2">
+                            <i class="fas fa-calendar me-2 text-primary"></i>
+                            <strong>Yüklenme:</strong> {{ model.uploaded_at|date:"d.m.Y H:i" }}
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-2">
+                            <i class="fas fa-check-circle me-2 text-primary"></i>
+                            <strong>Durum:</strong>
+                            {% if model.is_processed %}
+                                <span class="badge bg-success">İşlenmiş</span>
+                            {% else %}
+                                <span class="badge bg-warning">Ham Model</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="d-grid gap-2">
+                    <a href="{{ model.original_file.url }}" class="btn btn-success" download>
+                        <i class="fas fa-download me-2"></i>Dosyayı İndir
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        {% if model.analysis %}
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>Hızlı Analiz Özeti
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4 mb-3">
+                        <i class="fas fa-dot-circle fa-2x text-primary mb-2"></i>
+                        <h4>{{ model.analysis.vertices_count|intcomma }}</h4>
+                        <p class="text-muted mb-0">Vertex</p>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <i class="fas fa-shapes fa-2x text-success mb-2"></i>
+                        <h4>{{ model.analysis.faces_count|intcomma }}</h4>
+                        <p class="text-muted mb-0">Face</p>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <i class="fas fa-{{ model.analysis.is_watertight|yesno:'check-circle,times-circle' }} fa-2x text-{{ model.analysis.is_watertight|yesno:'success,warning' }} mb-2"></i>
+                        <h4>{{ model.analysis.is_watertight|yesno:"Kapalı,Açık" }}</h4>
+                        <p class="text-muted mb-0">Topoloji</p>
+                    </div>
+                </div>
+                
+                <a href="{% url 'analysis:analysis_results' model.id %}" class="btn btn-info w-100">
+                    <i class="fas fa-chart-line me-2"></i>Detaylı Analiz Sonuçları
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card mb-3">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">
+                    <i class="fas fa-tools me-2"></i>İşlemler
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if model.analysis %}
+                        <a href="{% url 'analysis:analysis_results' model.id %}" class="btn btn-success">
+                            <i class="fas fa-chart-line me-2"></i>Analiz Sonuçları
+                        </a>
+                    {% else %}
+                        <a href="{% url 'analysis:analyze_model' model.id %}" class="btn btn-warning">
+                            <i class="fas fa-search me-2"></i>Analiz Et
+                        </a>
+                    {% endif %}
+                    
+                    <a href="{% url 'visualization:visualize_model' model.id %}" class="btn btn-info">
+                        <i class="fas fa-cube me-2"></i>3D Görüntüle
+                    </a>
+                    
+                    <a href="{% url 'processing:processing_dashboard' model.id %}" class="btn btn-primary">
+                        <i class="fas fa-cogs me-2"></i>İşleme Paneli
+                    </a>
+                    
+                    <hr>
+                    
+                    <a href="{% url 'models:model_delete' model.id %}" class="btn btn-danger">
+                        <i class="fas fa-trash me-2"></i>Modeli Sil
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+

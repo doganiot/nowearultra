@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block title %}Model Sil - {{ model.name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-6 mx-auto">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Model Silme Onayı
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Bu işlem geri alınamaz!
+                </div>
+                
+                <p>Aşağıdaki modeli silmek istediğinizden emin misiniz?</p>
+                
+                <div class="card bg-light mb-4">
+                    <div class="card-body">
+                        <h5><i class="fas fa-cube me-2"></i>{{ model.name }}</h5>
+                        <p class="mb-1">
+                            <small class="text-muted">
+                                <i class="fas fa-file me-1"></i>{{ model.file_format|upper }} |
+                                <i class="fas fa-weight me-1"></i>{{ model.file_size|filesizeformat }} |
+                                <i class="fas fa-calendar me-1"></i>{{ model.uploaded_at|date:"d.m.Y H:i" }}
+                            </small>
+                        </p>
+                    </div>
+                </div>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-danger btn-lg">
+                            <i class="fas fa-trash me-2"></i>Evet, Sil
+                        </button>
+                        <a href="{% url 'models:model_detail' model.id %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-2"></i>İptal
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+

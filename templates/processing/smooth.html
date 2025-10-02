@@ -1,0 +1,372 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}Model Yumuşatma - {{ model.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    #canvas-container {
+        width: 100%;
+        height: 400px;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        border-radius: 10px;
+        position: relative;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Başlık -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-magic text-success"></i> Model Yumuşatma</h2>
+                    <p class="text-muted mb-0">{{ model.name }}</p>
+                </div>
+                <a href="{% url 'processing:processing_dashboard' model_id=model.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Kontrol Paneline Dön
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Yumuşatma Kontrolleri -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-sliders-h"></i> Yumuşatma Ayarları</h5>
+                </div>
+                <div class="card-body">
+                    <form id="smoothForm">
+                        {% csrf_token %}
+                        
+                        <!-- Yumuşatma Algoritması -->
+                        <div class="mb-4">
+                            <label class="form-label"><i class="fas fa-brain"></i> Algoritma</label>
+                            <select class="form-select" id="smoothAlgorithm">
+                                <option value="laplacian">Laplacian Smoothing</option>
+                                <option value="taubin">Taubin Smoothing</option>
+                                <option value="hc">HC (Humphrey's Classes) Smoothing</option>
+                            </select>
+                            <div class="form-text">
+                                <small><i class="fas fa-info-circle"></i> Laplacian: Hızlı ve basit yumuşatma</small>
+                            </div>
+                        </div>
+
+                        <!-- Yumuşatma Yoğunluğu -->
+                        <div class="mb-4">
+                            <label for="smoothIntensity" class="form-label">
+                                <i class="fas fa-chart-line"></i> Yumuşatma Yoğunluğu
+                                <span class="badge bg-success ms-2" id="intensityValue">5</span>
+                            </label>
+                            <input type="range" class="form-range" id="smoothIntensity" min="1" max="10" value="5" step="1">
+                            <div class="form-text d-flex justify-content-between">
+                                <small>Az</small>
+                                <small>Orta</small>
+                                <small>Çok</small>
+                            </div>
+                        </div>
+
+                        <!-- İterasyon Sayısı -->
+                        <div class="mb-4">
+                            <label for="iterations" class="form-label">
+                                <i class="fas fa-redo"></i> İterasyon Sayısı
+                                <span class="badge bg-info ms-2" id="iterValue">10</span>
+                            </label>
+                            <input type="range" class="form-range" id="iterations" min="1" max="50" value="10" step="1">
+                            <div class="form-text">
+                                <small>Daha fazla iterasyon = Daha yumuşak yüzey</small>
+                            </div>
+                        </div>
+
+                        <!-- Kenar Koruma -->
+                        <div class="mb-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="preserveEdges" checked>
+                                <label class="form-check-label" for="preserveEdges">
+                                    <i class="fas fa-border-style"></i> Keskin Kenarları Koru
+                                </label>
+                            </div>
+                            <div class="form-text">
+                                <small>Modelin önemli detaylarını korur</small>
+                            </div>
+                        </div>
+
+                        <!-- Butonlar -->
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-success btn-lg" id="applySmooth">
+                                <i class="fas fa-magic"></i> Yumuşatmayı Uygula
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="resetSmooth">
+                                <i class="fas fa-undo"></i> Sıfırla
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Önizleme ve Bilgi -->
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-eye"></i> Canlı Önizleme</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div id="canvas-container"></div>
+                </div>
+            </div>
+
+            <!-- Bilgilendirme -->
+            <div class="card shadow-sm mt-3">
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="mb-0"><i class="fas fa-lightbulb"></i> İpuçları</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0 small">
+                        <li>Düşük yoğunluk küçük düzeltmeler için uygundur</li>
+                        <li>Yüksek iterasyon sayısı daha pürüzsüz sonuç verir</li>
+                        <li>Kenar koruma özelliği detayları muhafaza eder</li>
+                        <li>İşlem öncesi modelinizi yedeklemeyi unutmayın</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Hızlı Preset'ler -->
+            <div class="card shadow-sm mt-3">
+                <div class="card-header bg-secondary text-white">
+                    <h6 class="mb-0"><i class="fas fa-bolt"></i> Hızlı Ayarlar</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-sm btn-outline-primary" onclick="applyPreset('light')">
+                            <i class="fas fa-feather"></i> Hafif Yumuşatma
+                        </button>
+                        <button class="btn btn-sm btn-outline-success" onclick="applyPreset('medium')">
+                            <i class="fas fa-adjust"></i> Orta Yumuşatma
+                        </button>
+                        <button class="btn btn-sm btn-outline-warning" onclick="applyPreset('strong')">
+                            <i class="fas fa-fire"></i> Güçlü Yumuşatma
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Three.js Kütüphaneleri -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+
+<script>
+let scene, camera, renderer, controls, mesh;
+let originalGeometry;
+
+// Three.js Kurulum
+function initViewer() {
+    const container = document.getElementById('canvas-container');
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+
+    camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 10000);
+    camera.position.set(0, 0, 100);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    container.appendChild(renderer.domElement);
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+
+    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight1.position.set(1, 1, 1);
+    scene.add(directionalLight1);
+
+    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+    directionalLight2.position.set(-1, 0.5, -1);
+    scene.add(directionalLight2);
+
+    const gridHelper = new THREE.GridHelper(200, 20, 0x444444, 0x222222);
+    scene.add(gridHelper);
+
+    loadSTL();
+    animate();
+
+    window.addEventListener('resize', function() {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+}
+
+// STL Yükle
+function loadSTL() {
+    const loader = new THREE.STLLoader();
+    loader.load('{{ model.original_file.url }}', function(geometry) {
+        geometry.center();
+        originalGeometry = geometry.clone();
+        
+        const material = new THREE.MeshPhongMaterial({
+            color: 0x4caf50,
+            specular: 0x111111,
+            shininess: 200,
+            flatShading: false
+        });
+
+        mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        const box = new THREE.Box3().setFromObject(mesh);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fov = camera.fov * (Math.PI / 180);
+        let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
+        
+        camera.position.set(center.x, center.y, center.z + cameraZ);
+        camera.lookAt(center);
+        controls.target.copy(center);
+        controls.update();
+    });
+}
+
+// Animasyon
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+// Yumuşatma simülasyonu (basit shading değişimi)
+function updateSmoothingPreview() {
+    if (!mesh) return;
+    
+    const intensity = parseInt(document.getElementById('smoothIntensity').value);
+    const preserveEdges = document.getElementById('preserveEdges').checked;
+    
+    // Flat shading vs smooth shading
+    mesh.material.flatShading = (intensity < 3);
+    mesh.material.needsUpdate = true;
+    
+    // Shininess ayarı
+    mesh.material.shininess = 50 + (intensity * 50);
+}
+
+// Slider güncellemeleri
+document.getElementById('smoothIntensity').addEventListener('input', function(e) {
+    document.getElementById('intensityValue').textContent = e.target.value;
+    updateSmoothingPreview();
+});
+
+document.getElementById('iterations').addEventListener('input', function(e) {
+    document.getElementById('iterValue').textContent = e.target.value;
+});
+
+document.getElementById('preserveEdges').addEventListener('change', function() {
+    updateSmoothingPreview();
+});
+
+// Preset'ler
+function applyPreset(type) {
+    switch(type) {
+        case 'light':
+            document.getElementById('smoothIntensity').value = 3;
+            document.getElementById('iterations').value = 5;
+            document.getElementById('intensityValue').textContent = '3';
+            document.getElementById('iterValue').textContent = '5';
+            document.getElementById('preserveEdges').checked = true;
+            break;
+        case 'medium':
+            document.getElementById('smoothIntensity').value = 5;
+            document.getElementById('iterations').value = 10;
+            document.getElementById('intensityValue').textContent = '5';
+            document.getElementById('iterValue').textContent = '10';
+            document.getElementById('preserveEdges').checked = true;
+            break;
+        case 'strong':
+            document.getElementById('smoothIntensity').value = 8;
+            document.getElementById('iterations').value = 25;
+            document.getElementById('intensityValue').textContent = '8';
+            document.getElementById('iterValue').textContent = '25';
+            document.getElementById('preserveEdges').checked = false;
+            break;
+    }
+    updateSmoothingPreview();
+}
+
+// Sıfırla
+document.getElementById('resetSmooth').addEventListener('click', function() {
+    applyPreset('medium');
+    document.getElementById('smoothAlgorithm').value = 'laplacian';
+});
+
+// Uygula - GERÇEKten yumuşat!
+document.getElementById('applySmooth').addEventListener('click', function() {
+    const button = this;
+    const originalText = button.innerHTML;
+    
+    // Onay iste
+    if (!confirm('Bu işlem modeli gerçekten yumuşatacak ve orijinal dosyayı değiştirecek. Devam etmek istiyor musunuz?')) {
+        return;
+    }
+    
+    // Butonu devre dışı bırak
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Yumuşatılıyor...';
+    
+    const algorithm = document.getElementById('smoothAlgorithm').value;
+    const intensity = document.getElementById('smoothIntensity').value;
+    const iterations = document.getElementById('iterations').value;
+    const preserveEdges = document.getElementById('preserveEdges').checked;
+    
+    // API'ye gerçek yumuşatma isteği gönder
+    fetch('{% url "processing:smooth_model" model_id=model.id %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+            algorithm: algorithm,
+            intensity: intensity,
+            iterations: iterations,
+            preserve_edges: preserveEdges
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Yumuşatma işlemi başarıyla tamamlandı!\n\nModel yumuşatıldı ve kaydedildi.');
+            window.location.href = data.redirect_url || '{% url "processing:processing_dashboard" model_id=model.id %}';
+        } else {
+            alert('❌ Hata: ' + data.error);
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        alert('❌ Bir hata oluştu: ' + error);
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+});
+
+// Viewer'ı başlat
+initViewer();
+</script>
+{% endblock %}
+

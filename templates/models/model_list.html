@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Modeller - NoWearUltra{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2>
+                <i class="fas fa-cubes text-primary me-2"></i>
+                3D Modeller
+            </h2>
+            <a href="{% url 'models:model_upload' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Yeni Model
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if models %}
+<div class="row g-4">
+    {% for model in models %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-cube text-primary me-2"></i>
+                        {{ model.name }}
+                    </h5>
+                    <span class="badge bg-{{ model.is_processed|yesno:'success,warning' }}">
+                        {% if model.is_processed %}
+                            <i class="fas fa-check me-1"></i>İşlenmiş
+                        {% else %}
+                            <i class="fas fa-clock me-1"></i>Ham
+                        {% endif %}
+                    </span>
+                </div>
+                
+                <div class="mb-3">
+                    <small class="text-muted">
+                        <i class="fas fa-calendar me-1"></i>
+                        {{ model.uploaded_at|date:"d.m.Y H:i" }}
+                    </small>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span><i class="fas fa-file me-1"></i>Format:</span>
+                        <strong class="text-uppercase">{{ model.file_format }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mt-2">
+                        <span><i class="fas fa-weight me-1"></i>Boyut:</span>
+                        <strong>{{ model.file_size|filesizeformat }}</strong>
+                    </div>
+                </div>
+                
+                {% if model.analysis %}
+                <div class="alert alert-info py-2 px-3 mb-3">
+                    <small>
+                        <i class="fas fa-chart-bar me-1"></i>
+                        <strong>{{ model.analysis.vertices_count|intcomma }}</strong> vertex,
+                        <strong>{{ model.analysis.faces_count|intcomma }}</strong> face
+                    </small>
+                </div>
+                {% endif %}
+                
+                <div class="d-grid gap-2">
+                    <a href="{% url 'models:model_detail' model.id %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-eye me-1"></i>Detaylar
+                    </a>
+                    
+                    {% if model.analysis %}
+                    <a href="{% url 'analysis:analysis_results' model.id %}" class="btn btn-success btn-sm">
+                        <i class="fas fa-chart-line me-1"></i>Analiz Sonuçları
+                    </a>
+                    {% else %}
+                    <a href="{% url 'analysis:analyze_model' model.id %}" class="btn btn-warning btn-sm">
+                        <i class="fas fa-search me-1"></i>Analiz Et
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-footer bg-transparent">
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'visualization:visualize_model' model.id %}" class="btn btn-sm btn-outline-info">
+                        <i class="fas fa-cube me-1"></i>3D Görüntüle
+                    </a>
+                    <a href="{% url 'processing:processing_dashboard' model.id %}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-cogs me-1"></i>İşle
+                    </a>
+                    <a href="{% url 'models:model_delete' model.id %}" class="btn btn-sm btn-outline-danger">
+                        <i class="fas fa-trash me-1"></i>Sil
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>{{ models.count }}</strong> model bulundu.
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="row">
+    <div class="col-12">
+        <div class="card text-center p-5">
+            <div class="card-body">
+                <i class="fas fa-cube-slash fa-4x text-muted mb-3"></i>
+                <h4>Henüz model yüklenmemiş</h4>
+                <p class="text-muted mb-4">İlk 3D modelinizi yükleyerek başlayın.</p>
+                <a href="{% url 'models:model_upload' %}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-upload me-2"></i>Model Yükle
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+

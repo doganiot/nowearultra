@@ -1,0 +1,250 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}Analiz Sonuçları - {{ model.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Başlık ve Geri Dön Butonu -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-chart-line text-primary"></i> Analiz Sonuçları</h2>
+                    <p class="text-muted mb-0">{{ model.name }}</p>
+                </div>
+                <a href="{% url 'models:model_detail' model_id=model.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Geri Dön
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Model Bilgileri Kartı -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-cube"></i> Model Bilgileri</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h4 class="text-primary mb-1">{{ analysis.vertices_count|intcomma }}</h4>
+                                <small class="text-muted">Vertex Sayısı</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h4 class="text-primary mb-1">{{ analysis.faces_count|intcomma }}</h4>
+                                <small class="text-muted">Yüzey Sayısı</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-light rounded">
+                                {% if analysis.volume %}
+                                    <h4 class="text-primary mb-1">{{ analysis.volume|floatformat:2 }}</h4>
+                                    <small class="text-muted">Hacim (mm³)</small>
+                                {% else %}
+                                    <h4 class="text-muted mb-1">-</h4>
+                                    <small class="text-muted">Hacim</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-light rounded">
+                                {% if analysis.surface_area %}
+                                    <h4 class="text-primary mb-1">{{ analysis.surface_area|floatformat:2 }}</h4>
+                                    <small class="text-muted">Yüzey Alanı (mm²)</small>
+                                {% else %}
+                                    <h4 class="text-muted mb-1">-</h4>
+                                    <small class="text-muted">Yüzey Alanı</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Topoloji Durumu -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-project-diagram"></i> Topoloji Durumu</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="fw-bold">Su Geçirmezlik:</label>
+                        {% if analysis.is_watertight %}
+                            <span class="badge bg-success ms-2">
+                                <i class="fas fa-check-circle"></i> Watertight (Sağlam)
+                            </span>
+                        {% else %}
+                            <span class="badge bg-warning ms-2">
+                                <i class="fas fa-exclamation-triangle"></i> Açık Geometri
+                            </span>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="fw-bold">Durum:</label>
+                        <p class="mb-0">{{ analysis.topology_status }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-ruler-combined"></i> Bounding Box</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <label class="fw-bold">Minimum Noktası:</label>
+                        <p class="mb-0 font-monospace">{{ analysis.bounding_box_min }}</p>
+                    </div>
+                    <div>
+                        <label class="fw-bold">Maksimum Noktası:</label>
+                        <p class="mb-0 font-monospace">{{ analysis.bounding_box_max }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Geometrik Özellikler -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-shapes"></i> Geometrik Özellikler</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title"><i class="fas fa-arrow-up text-success"></i> Üst Noktalar</h6>
+                                    {% if analysis.top_points %}
+                                        <pre class="mb-0 font-monospace small">{{ analysis.top_points }}</pre>
+                                    {% else %}
+                                        <p class="text-muted mb-0">Veri yok</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title"><i class="fas fa-arrow-down text-danger"></i> Alt Noktalar</h6>
+                                    {% if analysis.bottom_points %}
+                                        <pre class="mb-0 font-monospace small">{{ analysis.bottom_points }}</pre>
+                                    {% else %}
+                                        <p class="text-muted mb-0">Veri yok</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title"><i class="fas fa-star text-warning"></i> Keskin Noktalar</h6>
+                                    {% if analysis.sharp_points %}
+                                        <pre class="mb-0 font-monospace small">{{ analysis.sharp_points }}</pre>
+                                    {% else %}
+                                        <p class="text-muted mb-0">Veri yok</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title"><i class="fas fa-arrows-alt-h text-primary"></i> En Geniş Alan</h6>
+                                    {% if analysis.widest_area %}
+                                        <pre class="mb-0 font-monospace small">{{ analysis.widest_area }}</pre>
+                                    {% else %}
+                                        <p class="text-muted mb-0">Veri yok</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title"><i class="fas fa-compress text-secondary"></i> En Dar Alan</h6>
+                                    {% if analysis.narrowest_area %}
+                                        <pre class="mb-0 font-monospace small">{{ analysis.narrowest_area }}</pre>
+                                    {% else %}
+                                        <p class="text-muted mb-0">Veri yok</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analiz Tarih Bilgisi -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <small class="text-muted">
+                                <i class="fas fa-clock"></i> 
+                                Analiz Tarihi: {{ analysis.created_at|date:"d F Y, H:i" }}
+                            </small>
+                        </div>
+                        <div>
+                            <a href="{% url 'models:model_detail' model_id=model.id %}" class="btn btn-primary">
+                                <i class="fas fa-eye"></i> Model Detaylarına Dön
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        transition: transform 0.2s;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .bg-light {
+        background-color: #f8f9fa !important;
+    }
+    
+    pre {
+        background-color: white;
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #dee2e6;
+        max-height: 150px;
+        overflow-y: auto;
+    }
+    
+    .font-monospace {
+        font-family: 'Courier New', monospace;
+    }
+</style>
+{% endblock %}
+

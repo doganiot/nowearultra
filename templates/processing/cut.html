@@ -1,0 +1,404 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}Model Kesme - {{ model.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    #canvas-container {
+        width: 100%;
+        height: 500px;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        border-radius: 10px;
+        position: relative;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Başlık -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-cut text-danger"></i> Model Kesme</h2>
+                    <p class="text-muted mb-0">{{ model.name }}</p>
+                </div>
+                <a href="{% url 'processing:processing_dashboard' model_id=model.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Kontrol Paneline Dön
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kesme Kontrolleri -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-sliders-h"></i> Kesme Ayarları</h5>
+                </div>
+                <div class="card-body">
+                    <form id="cutForm">
+                        {% csrf_token %}
+                        
+                        <!-- Kesme Düzlemi -->
+                        <div class="mb-4">
+                            <label class="form-label"><i class="fas fa-layer-group"></i> Kesme Düzlemi</label>
+                            <select class="form-select" id="cutPlane">
+                                <option value="xy">XY Düzlemi (Yatay)</option>
+                                <option value="xz">XZ Düzlemi</option>
+                                <option value="yz">YZ Düzlemi (Dikey)</option>
+                            </select>
+                        </div>
+
+                        <!-- Kesme Pozisyonu -->
+                        <div class="mb-4">
+                            <label for="cutPosition" class="form-label">
+                                <i class="fas fa-arrows-alt-v"></i> Kesme Pozisyonu
+                                <span class="badge bg-danger ms-2" id="posValue">50%</span>
+                            </label>
+                            <input type="range" class="form-range" id="cutPosition" min="0" max="100" value="50" step="1">
+                        </div>
+
+                        <!-- Kesme Yönü -->
+                        <div class="mb-4">
+                            <label class="form-label"><i class="fas fa-directions"></i> Kesme Yönü</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="cutDirection" id="keepAbove" value="above" checked>
+                                <label class="btn btn-outline-primary" for="keepAbove">
+                                    <i class="fas fa-arrow-up"></i> Üstü Koru
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="cutDirection" id="keepBelow" value="below">
+                                <label class="btn btn-outline-primary" for="keepBelow">
+                                    <i class="fas fa-arrow-down"></i> Altı Koru
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Düzlem Eğimi -->
+                        <div class="mb-4">
+                            <label class="form-label">
+                                <i class="fas fa-sliders-h"></i> Düzlem Eğimi
+                            </label>
+                            
+                            <!-- X Ekseni Eğimi -->
+                            <div class="mb-3">
+                                <label for="tiltX" class="form-label small">
+                                    X Ekseni Eğimi
+                                    <span class="badge bg-info ms-2" id="tiltXValue">0°</span>
+                                </label>
+                                <input type="range" class="form-range form-range-sm" id="tiltX" min="-45" max="45" value="0" step="1">
+                            </div>
+                            
+                            <!-- Y Ekseni Eğimi -->
+                            <div class="mb-3">
+                                <label for="tiltY" class="form-label small">
+                                    Y Ekseni Eğimi
+                                    <span class="badge bg-info ms-2" id="tiltYValue">0°</span>
+                                </label>
+                                <input type="range" class="form-range form-range-sm" id="tiltY" min="-45" max="45" value="0" step="1">
+                            </div>
+                            
+                            <div class="form-text">
+                                <small><i class="fas fa-info-circle"></i> Eğim düzlemin açısını değiştirir</small>
+                            </div>
+                        </div>
+
+                        <!-- Butonlar -->
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-danger btn-lg" id="applyCut">
+                                <i class="fas fa-cut"></i> Kesmeyi Uygula
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="resetCut">
+                                <i class="fas fa-undo"></i> Sıfırla
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Önizleme Alanı -->
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-eye"></i> Canlı Önizleme</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div id="canvas-container"></div>
+                </div>
+            </div>
+
+            <!-- Bilgilendirme -->
+            <div class="alert alert-warning mt-3">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Dikkat!</strong> Bu işlem gerçek bir kesme yapacak!
+                <ul class="mb-0 mt-2 small">
+                    <li>Model fiziksel olarak kesilecek</li>
+                    <li>Orijinal dosya kesilmiş versiyonla değişecek</li>
+                    <li>İşlem geçmişinden önceki versiyona erişebilirsiniz</li>
+                    <li>İşlem 3-10 saniye sürebilir</li>
+                </ul>
+            </div>
+
+            <!-- Eğim Bilgisi -->
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-info-circle"></i>
+                <strong>Eğim Özelliği:</strong> Kesme düzlemine -45° ile +45° arası eğim verebilirsiniz. Bu, açılı kesimler için kullanışlıdır.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Three.js Kütüphaneleri -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+
+<script>
+let scene, camera, renderer, controls, mesh, cutPlane;
+let clippingPlane;
+
+// Three.js Kurulum
+function initViewer() {
+    const container = document.getElementById('canvas-container');
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+
+    camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 10000);
+    camera.position.set(0, 0, 100);
+
+    renderer = new THREE.WebGLRenderer({ 
+        antialias: true,
+        localClippingEnabled: true 
+    });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    container.appendChild(renderer.domElement);
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(1, 1, 1);
+    scene.add(directionalLight);
+
+    const gridHelper = new THREE.GridHelper(200, 20, 0x444444, 0x222222);
+    scene.add(gridHelper);
+
+    // Kesme düzlemi
+    clippingPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+    loadSTL();
+    animate();
+
+    window.addEventListener('resize', function() {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+}
+
+// STL Yükle
+function loadSTL() {
+    const loader = new THREE.STLLoader();
+    loader.load('{{ model.original_file.url }}', function(geometry) {
+        geometry.center();
+        
+        const material = new THREE.MeshPhongMaterial({
+            color: 0xff5722,
+            specular: 0x111111,
+            shininess: 200,
+            side: THREE.DoubleSide,
+            clippingPlanes: [clippingPlane],
+            clipShadows: true
+        });
+
+        mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        // Kesme düzlemini görselleştir
+        const planeHelper = new THREE.PlaneHelper(clippingPlane, 100, 0xff0000);
+        scene.add(planeHelper);
+        cutPlane = planeHelper;
+
+        const box = new THREE.Box3().setFromObject(mesh);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fov = camera.fov * (Math.PI / 180);
+        let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
+        
+        camera.position.set(center.x, center.y, center.z + cameraZ);
+        camera.lookAt(center);
+        controls.target.copy(center);
+        controls.update();
+
+        updateCutPlane();
+    });
+}
+
+// Animasyon
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+// Kesme düzlemini güncelle (eğim dahil)
+function updateCutPlane() {
+    if (!mesh) return;
+
+    const box = new THREE.Box3().setFromObject(mesh);
+    const size = box.getSize(new THREE.Vector3());
+    const plane = document.getElementById('cutPlane').value;
+    const position = document.getElementById('cutPosition').value;
+    const normalizedPos = (position / 100) - 0.5; // -0.5 to 0.5
+    const tiltX = parseFloat(document.getElementById('tiltX').value);
+    const tiltY = parseFloat(document.getElementById('tiltY').value);
+
+    let normal = new THREE.Vector3(0, 1, 0);
+    let constant = 0;
+
+    switch(plane) {
+        case 'xy':
+            normal = new THREE.Vector3(0, 0, 1);
+            constant = -normalizedPos * size.z;
+            break;
+        case 'xz':
+            normal = new THREE.Vector3(0, 1, 0);
+            constant = -normalizedPos * size.y;
+            break;
+        case 'yz':
+            normal = new THREE.Vector3(1, 0, 0);
+            constant = -normalizedPos * size.x;
+            break;
+    }
+
+    // Eğim uygula
+    if (tiltX !== 0 || tiltY !== 0) {
+        const euler = new THREE.Euler(
+            THREE.MathUtils.degToRad(tiltX),
+            THREE.MathUtils.degToRad(tiltY),
+            0,
+            'XYZ'
+        );
+        normal.applyEuler(euler);
+        normal.normalize();
+    }
+
+    clippingPlane.normal.copy(normal);
+    clippingPlane.constant = constant;
+
+    if (cutPlane) {
+        scene.remove(cutPlane);
+        cutPlane = new THREE.PlaneHelper(clippingPlane, Math.max(size.x, size.y, size.z) * 1.5, 0xff0000);
+        scene.add(cutPlane);
+    }
+}
+
+// Pozisyon slider
+document.getElementById('cutPosition').addEventListener('input', function(e) {
+    document.getElementById('posValue').textContent = e.target.value + '%';
+    updateCutPlane();
+});
+
+// Eğim slider'ları
+document.getElementById('tiltX').addEventListener('input', function(e) {
+    document.getElementById('tiltXValue').textContent = e.target.value + '°';
+    updateCutPlane();
+});
+
+document.getElementById('tiltY').addEventListener('input', function(e) {
+    document.getElementById('tiltYValue').textContent = e.target.value + '°';
+    updateCutPlane();
+});
+
+// Düzlem değişimi
+document.getElementById('cutPlane').addEventListener('change', function() {
+    updateCutPlane();
+});
+
+// Sıfırla
+document.getElementById('resetCut').addEventListener('click', function() {
+    document.getElementById('cutPosition').value = 50;
+    document.getElementById('posValue').textContent = '50%';
+    document.getElementById('cutPlane').value = 'xy';
+    document.getElementById('keepAbove').checked = true;
+    document.getElementById('tiltX').value = 0;
+    document.getElementById('tiltY').value = 0;
+    document.getElementById('tiltXValue').textContent = '0°';
+    document.getElementById('tiltYValue').textContent = '0°';
+    updateCutPlane();
+});
+
+// Uygula - GERÇEKten kes!
+document.getElementById('applyCut').addEventListener('click', function() {
+    const button = this;
+    const originalText = button.innerHTML;
+    
+    // Onay iste
+    if (!confirm('Bu işlem modeli gerçekten kesecek ve orijinal dosyayı değiştirecek. Devam etmek istiyor musunuz?')) {
+        return;
+    }
+    
+    // Butonu devre dışı bırak
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Kesiliyor...';
+    
+    const plane = document.getElementById('cutPlane').value;
+    const position = document.getElementById('cutPosition').value;
+    const direction = document.querySelector('input[name="cutDirection"]:checked').value;
+    const tiltX = document.getElementById('tiltX').value;
+    const tiltY = document.getElementById('tiltY').value;
+    
+    // API'ye gerçek kesme isteği gönder
+    fetch('{% url "processing:cut_model" model_id=model.id %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+            cut_plane: plane,
+            position: position,
+            direction: direction,
+            tilt_x: tiltX,
+            tilt_y: tiltY
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Kesme işlemi başarıyla tamamlandı!\n\nModel kesildi ve kaydedildi.');
+            // Dashboard'a yönlendir
+            window.location.href = data.redirect_url || '{% url "processing:processing_dashboard" model_id=model.id %}';
+        } else {
+            alert('❌ Hata: ' + data.error);
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        alert('❌ Bir hata oluştu: ' + error);
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+});
+
+// Viewer'ı başlat
+initViewer();
+</script>
+{% endblock %}
+

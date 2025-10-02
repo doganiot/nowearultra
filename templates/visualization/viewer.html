@@ -1,0 +1,500 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}3D Görüntüleyici - {{ model.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        overflow: hidden;
+    }
+    
+    #viewer-container {
+        width: 100%;
+        height: calc(100vh - 120px);
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        position: relative;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    
+    #canvas-container {
+        width: 100%;
+        height: 100%;
+    }
+    
+    #viewer-placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: white;
+        text-align: center;
+    }
+    
+    .control-panel {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+        max-width: 250px;
+    }
+    
+    .control-panel h6 {
+        margin-bottom: 10px;
+        color: #333;
+        font-weight: bold;
+    }
+    
+    .control-item {
+        margin-bottom: 10px;
+    }
+    
+    .control-item label {
+        font-size: 12px;
+        color: #666;
+        display: block;
+        margin-bottom: 5px;
+    }
+    
+    .info-panel {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+    }
+    
+    .info-panel h6 {
+        margin-bottom: 10px;
+        color: #333;
+        font-weight: bold;
+    }
+    
+    .info-panel p {
+        margin-bottom: 5px;
+        font-size: 13px;
+        color: #666;
+    }
+    
+    .toolbar {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 10px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+    }
+    
+    .toolbar button {
+        margin: 0 5px;
+    }
+    
+    .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+    }
+    
+    .loading-spinner {
+        text-align: center;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+    <!-- Header -->
+    <div class="row mb-3">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-0">
+                        <i class="fas fa-cube text-primary"></i> 
+                        {{ model.name }}
+                    </h4>
+                    <small class="text-muted">3D Model Görüntüleyici</small>
+                </div>
+                <a href="{% url 'models:model_detail' model_id=model.id %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-arrow-left"></i> Geri Dön
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3D Viewer Container -->
+    <div class="row">
+        <div class="col-12">
+            <div id="viewer-container">
+                <!-- Yükleme Göstergesi -->
+                <div id="loading-overlay" class="loading-overlay">
+                    <div class="loading-spinner">
+                        <div class="spinner-border text-light" role="status" style="width: 3rem; height: 3rem;">
+                            <span class="visually-hidden">Yükleniyor...</span>
+                        </div>
+                        <p class="mt-3">Model yükleniyor...</p>
+                    </div>
+                </div>
+
+                <!-- Canvas Container -->
+                <div id="canvas-container"></div>
+
+                <!-- Toolbar -->
+                <div class="toolbar">
+                    <button class="btn btn-sm btn-light" id="btn-reset-view" title="Görünümü Sıfırla">
+                        <i class="fas fa-home"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" id="btn-wireframe" title="Wireframe">
+                        <i class="fas fa-border-all"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" id="btn-screenshot" title="Ekran Görüntüsü">
+                        <i class="fas fa-camera"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" id="btn-fullscreen" title="Tam Ekran">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                </div>
+
+                <!-- Control Panel -->
+                <div class="control-panel">
+                    <h6><i class="fas fa-sliders-h"></i> Kontroller</h6>
+                    
+                    <div class="control-item">
+                        <label>Döndürme Hızı</label>
+                        <input type="range" class="form-range form-range-sm" id="rotation-speed" min="0" max="10" value="5">
+                    </div>
+                    
+                    <div class="control-item">
+                        <label>Zoom</label>
+                        <input type="range" class="form-range form-range-sm" id="zoom-level" min="1" max="20" value="10">
+                    </div>
+                    
+                    <div class="control-item">
+                        <label>Işık Yoğunluğu</label>
+                        <input type="range" class="form-range form-range-sm" id="light-intensity" min="0" max="10" value="7">
+                    </div>
+                    
+                    <div class="control-item">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="show-grid" checked>
+                            <label class="form-check-label" for="show-grid">Grid Göster</label>
+                        </div>
+                    </div>
+                    
+                    <div class="control-item">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="show-axes" checked>
+                            <label class="form-check-label" for="show-axes">Eksen Göster</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Panel -->
+                <div class="info-panel">
+                    <h6><i class="fas fa-info-circle"></i> Model Bilgileri</h6>
+                    <p><strong>Dosya:</strong> {{ model.name }}</p>
+                    <p><strong>Format:</strong> {{ model.file_format|upper }}</p>
+                    <p><strong>Boyut:</strong> {{ model.file_size|filesizeformat }}</p>
+                    {% if model.analysis %}
+                        <hr class="my-2">
+                        <p><strong>Vertex:</strong> {{ model.analysis.vertices_count|default:"N/A" }}</p>
+                        <p><strong>Face:</strong> {{ model.analysis.faces_count|default:"N/A" }}</p>
+                        {% if model.analysis.is_watertight %}
+                            <p><span class="badge bg-success"><i class="fas fa-check"></i> Watertight</span></p>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kontrol Talimatları -->
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="card-title"><i class="fas fa-keyboard"></i> Kontroller</h6>
+                    <div class="row">
+                        <div class="col-md-2">
+                            <p class="mb-1"><strong><i class="fas fa-mouse"></i> Sol Tık + Sürükle:</strong> Döndür</p>
+                        </div>
+                        <div class="col-md-2">
+                            <p class="mb-1"><strong><i class="fas fa-mouse"></i> Sağ Tık + Sürükle:</strong> Kaydır</p>
+                        </div>
+                        <div class="col-md-2">
+                            <p class="mb-1"><strong><i class="fas fa-mouse"></i> Tekerlek:</strong> Yakınlaş/Uzaklaş</p>
+                        </div>
+                        <div class="col-md-2">
+                            <p class="mb-1"><strong><kbd>R</kbd>:</strong> Görünümü Sıfırla</p>
+                        </div>
+                        <div class="col-md-2">
+                            <p class="mb-1"><strong><kbd>W</kbd>:</strong> Wireframe</p>
+                        </div>
+                        <div class="col-md-2">
+                            <p class="mb-1"><strong><kbd>F</kbd>:</strong> Tam Ekran</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- Three.js Kütüphaneleri -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+
+<script>
+let scene, camera, renderer, controls, model, mesh;
+let isWireframe = false;
+let gridHelper, axesHelper;
+
+// Three.js Sahne Kurulumu
+function initViewer() {
+    const container = document.getElementById('canvas-container');
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    // Scene
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+
+    // Camera
+    camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 10000);
+    camera.position.set(0, 0, 100);
+
+    // Renderer
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    container.appendChild(renderer.domElement);
+
+    // Orbit Controls
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 10;
+    controls.maxDistance = 500;
+
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+
+    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight1.position.set(1, 1, 1);
+    scene.add(directionalLight1);
+
+    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+    directionalLight2.position.set(-1, -1, -1);
+    scene.add(directionalLight2);
+
+    // Grid
+    gridHelper = new THREE.GridHelper(200, 20, 0x444444, 0x222222);
+    scene.add(gridHelper);
+
+    // Axes
+    axesHelper = new THREE.AxesHelper(50);
+    scene.add(axesHelper);
+
+    // STL Yükleme
+    loadSTL();
+
+    // Animasyon
+    animate();
+
+    // Resize Handler
+    window.addEventListener('resize', onWindowResize);
+}
+
+// STL Dosyasını Yükle
+function loadSTL() {
+    const loader = new THREE.STLLoader();
+    const modelUrl = '{{ model.original_file.url }}';
+
+    loader.load(
+        modelUrl,
+        function(geometry) {
+            // Geometry'yi merkeze al
+            geometry.center();
+            
+            // Material
+            const material = new THREE.MeshPhongMaterial({
+                color: 0x00d4ff,
+                specular: 0x111111,
+                shininess: 200,
+                flatShading: false
+            });
+
+            // Mesh oluştur
+            if (mesh) {
+                scene.remove(mesh);
+            }
+            mesh = new THREE.Mesh(geometry, material);
+            scene.add(mesh);
+
+            // Kamerayı modele göre ayarla
+            const box = new THREE.Box3().setFromObject(mesh);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const fov = camera.fov * (Math.PI / 180);
+            let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+            cameraZ *= 1.5;
+            
+            camera.position.set(center.x, center.y, center.z + cameraZ);
+            camera.lookAt(center);
+            controls.target.copy(center);
+            controls.update();
+
+            // Loading overlay'i kaldır
+            document.getElementById('loading-overlay').style.display = 'none';
+            
+            console.log('Model yüklendi:', {
+                vertices: geometry.attributes.position.count,
+                faces: geometry.attributes.position.count / 3,
+                size: size
+            });
+        },
+        function(xhr) {
+            const percentComplete = (xhr.loaded / xhr.total) * 100;
+            console.log('Yükleniyor: ' + Math.round(percentComplete) + '%');
+        },
+        function(error) {
+            console.error('Model yükleme hatası:', error);
+            document.getElementById('loading-overlay').innerHTML = 
+                '<div class="loading-spinner"><i class="fas fa-exclamation-triangle fa-3x mb-3"></i><p>Model yüklenemedi!</p><small>' + error + '</small></div>';
+        }
+    );
+}
+
+// Animasyon Döngüsü
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    
+    // Otomatik döndürme (eğer ayarlanmışsa)
+    const rotationSpeed = document.getElementById('rotation-speed').value;
+    if (mesh && rotationSpeed > 0) {
+        mesh.rotation.y += rotationSpeed * 0.001;
+    }
+    
+    renderer.render(scene, camera);
+}
+
+// Pencere Boyutlandırma
+function onWindowResize() {
+    const container = document.getElementById('canvas-container');
+    camera.aspect = container.clientWidth / container.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(container.clientWidth, container.clientHeight);
+}
+
+// Görünümü Sıfırla
+document.getElementById('btn-reset-view').addEventListener('click', function() {
+    if (mesh) {
+        const box = new THREE.Box3().setFromObject(mesh);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fov = camera.fov * (Math.PI / 180);
+        let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+        cameraZ *= 1.5;
+        
+        camera.position.set(center.x, center.y, center.z + cameraZ);
+        camera.lookAt(center);
+        controls.target.copy(center);
+        controls.update();
+    }
+});
+
+// Wireframe Toggle
+document.getElementById('btn-wireframe').addEventListener('click', function() {
+    if (mesh) {
+        isWireframe = !isWireframe;
+        mesh.material.wireframe = isWireframe;
+        this.classList.toggle('active');
+    }
+});
+
+// Screenshot
+document.getElementById('btn-screenshot').addEventListener('click', function() {
+    const link = document.createElement('a');
+    link.download = '{{ model.name }}_screenshot.png';
+    link.href = renderer.domElement.toDataURL('image/png');
+    link.click();
+});
+
+// Fullscreen
+document.getElementById('btn-fullscreen').addEventListener('click', function() {
+    const container = document.getElementById('viewer-container');
+    if (!document.fullscreenElement) {
+        container.requestFullscreen();
+        this.innerHTML = '<i class="fas fa-compress"></i>';
+    } else {
+        document.exitFullscreen();
+        this.innerHTML = '<i class="fas fa-expand"></i>';
+    }
+});
+
+// Kontrol Paneli Event'leri
+document.getElementById('zoom-level').addEventListener('input', function(e) {
+    const zoom = e.target.value;
+    camera.zoom = zoom / 10;
+    camera.updateProjectionMatrix();
+});
+
+document.getElementById('light-intensity').addEventListener('input', function(e) {
+    const intensity = e.target.value / 10;
+    scene.children.forEach(child => {
+        if (child instanceof THREE.DirectionalLight) {
+            child.intensity = intensity;
+        }
+    });
+});
+
+document.getElementById('show-grid').addEventListener('change', function(e) {
+    gridHelper.visible = e.target.checked;
+});
+
+document.getElementById('show-axes').addEventListener('change', function(e) {
+    axesHelper.visible = e.target.checked;
+});
+
+// Keyboard Shortcuts
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'r' || e.key === 'R') {
+        document.getElementById('btn-reset-view').click();
+    } else if (e.key === 'w' || e.key === 'W') {
+        document.getElementById('btn-wireframe').click();
+    } else if (e.key === 'f' || e.key === 'F') {
+        document.getElementById('btn-fullscreen').click();
+    }
+});
+
+// Viewer'ı Başlat
+initViewer();
+</script>
+{% endblock %}
+

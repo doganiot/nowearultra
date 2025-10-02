@@ -1,0 +1,12 @@
+Django==4.2.23
+Pillow==10.4.0
+numpy
+trimesh
+networkx
+plotly
+django-cors-headers==4.4.0
+djangorestframework==3.15.2
+django-crispy-forms
+crispy-bootstrap5
+django-cleanup==8.1.0
+

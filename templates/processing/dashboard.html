@@ -1,0 +1,299 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}İşleme Kontrol Paneli - {{ model.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Başlık -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-cogs text-primary"></i> İşleme Kontrol Paneli</h2>
+                    <p class="text-muted mb-0">{{ model.name }}</p>
+                </div>
+                <a href="{% url 'models:model_detail' model_id=model.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Geri Dön
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Model Bilgileri -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Model Bilgileri</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <p><strong>Dosya Adı:</strong> {{ model.name }}</p>
+                            <p><strong>Yüklenme Tarihi:</strong> {{ model.uploaded_at|date:"d F Y, H:i" }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p><strong>Dosya Boyutu:</strong> {{ model.file_size|filesizeformat }}</p>
+                            <p><strong>Format:</strong> {{ model.file_format|upper }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p><strong>Durum:</strong> 
+                                <span class="badge bg-success">Yüklenmiş</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- İşleme Araçları -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-tools"></i> İşleme Araçları</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <!-- Döndürme -->
+                        <div class="col-md-4">
+                            <div class="card h-100 border-primary">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-sync-alt fa-3x text-primary mb-3"></i>
+                                    <h5 class="card-title">Model Döndürme</h5>
+                                    <p class="card-text text-muted small">
+                                        Modeli X, Y veya Z ekseninde döndürerek istediğiniz açıya getirin.
+                                    </p>
+                                    {% if stats.rotation_count > 0 %}
+                                        <span class="badge bg-success mb-2">{{ stats.rotation_count }}x yapıldı</span>
+                                    {% endif %}
+                                    <br>
+                                    <a href="{% url 'processing:rotate_model' model_id=model.id %}" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-rotate"></i> Döndür
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Kesme -->
+                        <div class="col-md-4">
+                            <div class="card h-100 border-danger">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-cut fa-3x text-danger mb-3"></i>
+                                    <h5 class="card-title">Model Kesme</h5>
+                                    <p class="card-text text-muted small">
+                                        Modelin istenmeyen kısımlarını keserek düzenleyin.
+                                    </p>
+                                    {% if stats.cutting_count > 0 %}
+                                        <span class="badge bg-success mb-2">{{ stats.cutting_count }}x yapıldı</span>
+                                    {% endif %}
+                                    <br>
+                                    <a href="{% url 'processing:cut_model' model_id=model.id %}" class="btn btn-danger btn-sm">
+                                        <i class="fas fa-cut"></i> Kes
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Delik Doldurma -->
+                        <div class="col-md-4">
+                            <div class="card h-100 border-warning">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-fill-drip fa-3x text-warning mb-3"></i>
+                                    <h5 class="card-title">Delik Doldurma</h5>
+                                    <p class="card-text text-muted small">
+                                        Model yüzeyindeki delikleri otomatik olarak doldurun.
+                                    </p>
+                                    {% if stats.fill_holes_count > 0 %}
+                                        <span class="badge bg-success mb-2">{{ stats.fill_holes_count }}x yapıldı</span>
+                                    {% endif %}
+                                    <br>
+                                    <a href="{% url 'processing:fill_holes' model_id=model.id %}" class="btn btn-warning btn-sm">
+                                        <i class="fas fa-fill"></i> Doldur
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Yumuşatma -->
+                        <div class="col-md-4 mt-3">
+                            <div class="card h-100 border-success">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-magic fa-3x text-success mb-3"></i>
+                                    <h5 class="card-title">Model Yumuşatma</h5>
+                                    <p class="card-text text-muted small">
+                                        Modelin yüzeyini yumuşatarak daha pürüzsüz hale getirin.
+                                    </p>
+                                    {% if stats.smoothing_count > 0 %}
+                                        <span class="badge bg-success mb-2">{{ stats.smoothing_count }}x yapıldı</span>
+                                    {% endif %}
+                                    <br>
+                                    <a href="{% url 'processing:smooth_model' model_id=model.id %}" class="btn btn-success btn-sm">
+                                        <i class="fas fa-wand-magic-sparkles"></i> Yumuşat
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Ovalleştirme -->
+                        <div class="col-md-4 mt-3">
+                            <div class="card h-100 border-info">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-circle fa-3x text-info mb-3"></i>
+                                    <h5 class="card-title">Ovalleştirme</h5>
+                                    <p class="card-text text-muted small">
+                                        Seçili bölgeleri ovalleştirerek organik form verin.
+                                    </p>
+                                    {% if stats.ovalization_count > 0 %}
+                                        <span class="badge bg-success mb-2">{{ stats.ovalization_count }}x yapıldı</span>
+                                    {% endif %}
+                                    <br>
+                                    <a href="{% url 'processing:ovalize_model' model_id=model.id %}" class="btn btn-info btn-sm">
+                                        <i class="fas fa-adjust"></i> Ovalleştir
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Delik Delme -->
+                        <div class="col-md-4 mt-3">
+                            <div class="card h-100 border-secondary">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-dot-circle fa-3x text-secondary mb-3"></i>
+                                    <h5 class="card-title">Delik Delme</h5>
+                                    <p class="card-text text-muted small">
+                                        Modele hava deliği veya montaj delikleri ekleyin.
+                                    </p>
+                                    {% if stats.drilling_count > 0 %}
+                                        <span class="badge bg-success mb-2">{{ stats.drilling_count }}x yapıldı</span>
+                                    {% endif %}
+                                    <br>
+                                    <a href="{% url 'processing:drill_hole' model_id=model.id %}" class="btn btn-secondary btn-sm">
+                                        <i class="fas fa-circle-notch"></i> Del
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- İşlemi Tamamla Butonu -->
+                    {% if stats.total_steps > 0 %}
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="alert alert-success d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas fa-check-circle"></i>
+                                    <strong>{{ stats.total_steps }} işlem tamamlandı!</strong> 
+                                    Artık sonraki aşamaya geçebilirsiniz.
+                                </div>
+                                <a href="{% url 'processing:complete' model_id=model.id %}" class="btn btn-success">
+                                    <i class="fas fa-arrow-right"></i> İşlemi Tamamla
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- İşleme Geçmişi -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-history"></i> İşleme Geçmişi</h5>
+                </div>
+                <div class="card-body">
+                    {% if steps %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>İşlem Türü</th>
+                                        <th>Parametreler</th>
+                                        <th>Durum</th>
+                                        <th>Tarih</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for step in steps %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>
+                                            {% if step.step_type == 'rotation' %}
+                                                <i class="fas fa-sync-alt text-primary"></i> Döndürme
+                                            {% elif step.step_type == 'cutting' %}
+                                                <i class="fas fa-cut text-danger"></i> Kesme
+                                            {% elif step.step_type == 'fill_holes' %}
+                                                <i class="fas fa-fill-drip text-warning"></i> Delik Doldurma
+                                            {% elif step.step_type == 'smoothing' %}
+                                                <i class="fas fa-magic text-success"></i> Yumuşatma
+                                            {% elif step.step_type == 'ovalization' %}
+                                                <i class="fas fa-circle text-info"></i> Ovalleştirme
+                                            {% elif step.step_type == 'drilling' %}
+                                                <i class="fas fa-dot-circle text-secondary"></i> Delik Delme
+                                            {% else %}
+                                                <i class="fas fa-cog"></i> {{ step.get_step_type_display }}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <code class="small">{{ step.parameters }}</code>
+                                        </td>
+                                        <td>
+                                            {% if step.success %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check"></i> Başarılı
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-danger">
+                                                    <i class="fas fa-times"></i> Başarısız
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ step.created_at|date:"d M Y, H:i" }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5 text-muted">
+                            <i class="fas fa-inbox fa-3x mb-3"></i>
+                            <p class="mb-0">Henüz işleme geçmişi bulunmuyor</p>
+                            <small>Yukarıdaki araçları kullanarak işleme başlatabilirsiniz</small>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        transition: all 0.3s ease;
+    }
+    
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.1) !important;
+    }
+    
+    .fa-3x {
+        font-size: 3rem;
+    }
+    
+    code {
+        background-color: #f8f9fa;
+        padding: 2px 6px;
+        border-radius: 3px;
+    }
+</style>
+{% endblock %}
+

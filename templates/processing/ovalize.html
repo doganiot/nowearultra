@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}Ovalleştirme - {{ model.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    #canvas-container {
+        width: 100%;
+        height: 500px;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        border-radius: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-circle text-info"></i> Ovalleştirme</h2>
+                    <p class="text-muted mb-0">{{ model.name }}</p>
+                </div>
+                <a href="{% url 'processing:processing_dashboard' model_id=model.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Geri Dön
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-sliders-h"></i> Ovalleştirme Ayarları</h5>
+                </div>
+                <div class="card-body">
+                    <form id="ovalizeForm">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label for="ovalIntensity" class="form-label">
+                                <i class="fas fa-chart-line"></i> Ovalleştirme Yoğunluğu
+                                <span class="badge bg-info ms-2" id="intensityValue">5</span>
+                            </label>
+                            <input type="range" class="form-range" id="ovalIntensity" min="1" max="10" value="5">
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label"><i class="fas fa-object-group"></i> Bölge Seçimi</label>
+                            <select class="form-select" id="region">
+                                <option value="all">Tüm Model</option>
+                                <option value="top">Üst Kısım</option>
+                                <option value="bottom">Alt Kısım</option>
+                                <option value="sides">Yan Kısımlar</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="preserveEdges" checked>
+                                <label class="form-check-label" for="preserveEdges">
+                                    <i class="fas fa-border-style"></i> Kenarları Koru
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-info btn-lg" id="applyOvalize">
+                                <i class="fas fa-adjust"></i> Ovalleştir
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="resetOvalize">
+                                <i class="fas fa-undo"></i> Sıfırla
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-eye"></i> Canlı Önizleme</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div id="canvas-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+
+<script>
+let scene, camera, renderer, controls, mesh;
+
+function initViewer() {
+    const container = document.getElementById('canvas-container');
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+    camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 10000);
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(renderer.domElement);
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    scene.add(new THREE.DirectionalLight(0xffffff, 0.8).position.set(1, 1, 1));
+    scene.add(new THREE.GridHelper(200, 20, 0x444444, 0x222222));
+
+    const loader = new THREE.STLLoader();
+    loader.load('{{ model.original_file.url }}', function(geometry) {
+        geometry.center();
+        mesh = new THREE.Mesh(geometry, new THREE.MeshPhongMaterial({ color: 0x17a2b8, shininess: 200 }));
+        scene.add(mesh);
+        
+        const box = new THREE.Box3().setFromObject(mesh);
+        const center = box.getCenter(new THREE.Vector3());
+        const maxDim = Math.max(...box.getSize(new THREE.Vector3()).toArray());
+        camera.position.set(center.x, center.y, center.z + maxDim * 1.5);
+        camera.lookAt(center);
+        controls.target.copy(center);
+    });
+
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+    }
+    animate();
+}
+
+document.getElementById('ovalIntensity').addEventListener('input', e => {
+    document.getElementById('intensityValue').textContent = e.target.value;
+});
+
+document.getElementById('applyOvalize').addEventListener('click', function() {
+    fetch('{% url "processing:save_step" model_id=model.id %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify({
+            step_type: 'ovalization',
+            parameters: {
+                intensity: document.getElementById('ovalIntensity').value,
+                region: document.getElementById('region').value,
+                preserve_edges: document.getElementById('preserveEdges').checked
+            }
+        })
+    }).then(r => r.json()).then(d => {
+        if (d.success) {
+            alert('Ovalleştirme işlemi kaydedildi!');
+            window.location.href = '{% url "processing:processing_dashboard" model_id=model.id %}';
+        }
+    });
+});
+
+initViewer();
+</script>
+{% endblock %}
+

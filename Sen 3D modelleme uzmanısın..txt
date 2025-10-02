@@ -1,0 +1,35 @@
+Sen 3D modelleme uzmanısın.
+
+Proje İsmi: 3D kulak kalıbı modelleme
+
+Amaç: Kullanıcıların yüklediği 3D modelleri hazır basılabilir, 3D kalıplara dönüştürmek için Web uygulaması entegrasyonu ve platformu
+
+
+
+Proje ilerlemesi: Proje 3 aşamada ilerlesin. 
+    1.Aşama: model yüklenmesi ve modelin tüm detaylarının alınması, Görselleştirilmesi, modelin uç noktalarının tespiti, modelin alt ve üst noktalarının tespiti, modelin sivri yerlerinin tespiti, modelin en geniş alanın yeri, modelin topolojisinin durumu, modelin en dar alanın yeri.
+
+    2. Aşama: Modelle müdahale aşaması.
+        Bu aşamada kendi içinde adım adım ilerlemeli
+            Döndürme,
+            Kesme,
+            Delik doldurma ve katı hale getirme,
+            1.Yumuşatma,
+            Kulak kepçe içi içeri ovalleştireme, 
+            kulak kanalı ucu bombeleştirme, 
+            2.tekrar yumuşatma,
+             model delme 2 adet birincisi hortum deliği 1,6 mm çapında,ikincisi 0.9 mm çapında vent açıklığı.
+
+            Bu aşamalar adım adım detaylandırılacak. her bir işlem tam geliştirildikten sonra diğer aşamaya geçilecek.
+
+            Projede ilerlerken.
+
+    3. Aşama : Modelin indirilmesi ve veri tabanına tüm detaylarıla kayıt edilmesi
+
+Dosya formatları: .stl, .ply
+
+Kullanılması önerilen Teknolojiler.
+
+ana yapıyı Django üzerinde inşaa et.
+.md dosyalarını oluştur.
+github repo :https://github.com/doganiot/nowear.git

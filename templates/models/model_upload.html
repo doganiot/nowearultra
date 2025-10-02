@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+
+{% block title %}Model Yükle - NoWearUltra{% endblock %}
+
+{% block extra_css %}
+<style>
+    .upload-area {
+        border: 3px dashed #3498db;
+        border-radius: 15px;
+        padding: 3rem;
+        text-align: center;
+        background-color: #f8f9fa;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+    
+    .upload-area:hover {
+        border-color: #2980b9;
+        background-color: #e8f4f8;
+    }
+    
+    .upload-area.dragover {
+        border-color: #27ae60;
+        background-color: #d5f4e6;
+    }
+    
+    .upload-icon {
+        font-size: 4rem;
+        color: #3498db;
+        margin-bottom: 1rem;
+    }
+    
+    .file-info {
+        display: none;
+        margin-top: 1rem;
+    }
+    
+    .file-info.show {
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">
+                    <i class="fas fa-upload me-2"></i>3D Model Yükle
+                </h3>
+            </div>
+            <div class="card-body p-4">
+                <form method="post" enctype="multipart/form-data" id="uploadForm">
+                    {% csrf_token %}
+                    
+                    <!-- Drag & Drop Area -->
+                    <div class="upload-area" id="uploadArea">
+                        <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                        <h4>Dosyanızı buraya sürükleyin</h4>
+                        <p class="text-muted mb-3">veya</p>
+                        <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                            <i class="fas fa-folder-open me-2"></i>Dosya Seç
+                        </button>
+                        <input type="file" id="fileInput" name="file" accept=".stl,.ply" style="display: none;">
+                        <p class="text-muted mt-3 mb-0">
+                            <small>Desteklenen formatlar: .STL, .PLY (Maks. 50MB)</small>
+                        </p>
+                    </div>
+                    
+                    <!-- File Info -->
+                    <div class="file-info" id="fileInfo">
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>
+                            <strong id="fileName"></strong> seçildi
+                            <span class="badge bg-primary ms-2" id="fileSize"></span>
+                            <span class="badge bg-info ms-2" id="fileType"></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Model Name -->
+                    <div class="mb-3 mt-4">
+                        <label for="name" class="form-label">
+                            <i class="fas fa-tag me-2"></i>Model Adı
+                        </label>
+                        <input type="text" class="form-control" id="name" name="name" 
+                               placeholder="Örn: Kulak Taraması 001" required>
+                        <small class="form-text text-muted">Modeli tanımlamanıza yardımcı olacak bir ad girin</small>
+                    </div>
+                    
+                    <!-- Submit Button -->
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn" disabled>
+                            <i class="fas fa-upload me-2"></i>Yükle ve Analiz Et
+                        </button>
+                        <a href="{% url 'models:model_list' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Geri Dön
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Info Card -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5><i class="fas fa-info-circle text-info me-2"></i>Yükleme Sonrası</h5>
+                <p class="mb-2">Model yüklendikten sonra otomatik olarak:</p>
+                <ul>
+                    <li>Geometrik analiz yapılır</li>
+                    <li>Özellik tespiti gerçekleştirilir</li>
+                    <li>3D görselleştirme hazırlanır</li>
+                    <li>İşleme araçları kullanıma açılır</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const fileInfo = document.getElementById('fileInfo');
+    const submitBtn = document.getElementById('submitBtn');
+    const nameInput = document.getElementById('name');
+    
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    // Highlight drop area
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, () => {
+            uploadArea.classList.add('dragover');
+        }, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, () => {
+            uploadArea.classList.remove('dragover');
+        }, false);
+    });
+    
+    // Handle dropped files
+    uploadArea.addEventListener('drop', handleDrop, false);
+    
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        fileInput.files = files;
+        handleFiles(files);
+    }
+    
+    // Handle selected files
+    fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+    });
+    
+    function handleFiles(files) {
+        if (files.length > 0) {
+            const file = files[0];
+            
+            // Check file type
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (ext !== 'stl' && ext !== 'ply') {
+                alert('Sadece .STL ve .PLY dosyaları desteklenmektedir!');
+                return;
+            }
+            
+            // Check file size (50MB = 52428800 bytes)
+            if (file.size > 52428800) {
+                alert('Dosya boyutu 50MB\'dan büyük olamaz!');
+                return;
+            }
+            
+            // Show file info
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            document.getElementById('fileType').textContent = ext.toUpperCase();
+            fileInfo.classList.add('show');
+            
+            // Auto-fill name if empty
+            if (!nameInput.value) {
+                nameInput.value = file.name.replace(/\.[^/.]+$/, "");
+            }
+            
+            // Enable submit button
+            submitBtn.disabled = false;
+        }
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+    
+    // Form submission
+    document.getElementById('uploadForm').addEventListener('submit', (e) => {
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Yükleniyor...';
+        submitBtn.disabled = true;
+    });
+</script>
+{% endblock %}
+
+

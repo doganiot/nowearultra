@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block title %}Hakkında - NoWearUltra{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-body p-5">
+                <h1 class="mb-4">
+                    <i class="fas fa-info-circle text-primary me-2"></i>
+                    Hakkında
+                </h1>
+                
+                <p class="lead">
+                    NoWearUltra, kulak kalıplarının 3D modellerini profesyonel, basılabilir kalıplara 
+                    dönüştüren gelişmiş bir web uygulamasıdır.
+                </p>
+                
+                <hr class="my-4">
+                
+                <h3 class="mb-3">Proje Aşamaları</h3>
+                
+                <div class="mb-4">
+                    <h5><i class="fas fa-search text-primary me-2"></i>Aşama 1: Model Analizi</h5>
+                    <p>
+                        Model yükleme, görselleştirme ve detaylı geometrik analiz. Modelin tüm 
+                        özelliklerini tespit eder: uç noktalar, sivri bölgeler, en geniş/dar alanlar, 
+                        topoloji durumu.
+                    </p>
+                </div>
+                
+                <div class="mb-4">
+                    <h5><i class="fas fa-cogs text-warning me-2"></i>Aşama 2: Model İşleme</h5>
+                    <p>
+                        Profesyonel işleme araçları ile modelinizi hazırlayın:
+                    </p>
+                    <ul>
+                        <li>Döndürme ve yönlendirme</li>
+                        <li>Kesme ve kırpma</li>
+                        <li>Delik doldurma ve katı hale getirme</li>
+                        <li>Yumuşatma (2 aşamalı)</li>
+                        <li>Kulak kepçe içi ovalleştirme</li>
+                        <li>Kulak kanalı ucu bombeleştirme</li>
+                        <li>Hassas delik delme (Hortum Ø1.7mm, Vent Ø0.9mm)</li>
+                    </ul>
+                </div>
+                
+                <div class="mb-4">
+                    <h5><i class="fas fa-download text-success me-2"></i>Aşama 3: Export ve Kayıt</h5>
+                    <p>
+                        İşlenmiş modelinizi STL veya PLY formatında indirin. Tüm işlem geçmişi 
+                        ve detaylar veritabanında güvenle saklanır.
+                    </p>
+                </div>
+                
+                <hr class="my-4">
+                
+                <h3 class="mb-3">Teknoloji Yığını</h3>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded">
+                            <h6><i class="fab fa-python text-primary me-2"></i>Backend</h6>
+                            <ul class="mb-0">
+                                <li>Django 4.2</li>
+                                <li>Trimesh</li>
+                                <li>NumPy</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded">
+                            <h6><i class="fab fa-html5 text-danger me-2"></i>Frontend</h6>
+                            <ul class="mb-0">
+                                <li>Bootstrap 5</li>
+                                <li>Plotly</li>
+                                <li>Three.js</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr class="my-4">
+                
+                <div class="text-center">
+                    <a href="{% url 'models:model_upload' %}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-upload me-2"></i>Şimdi Başla
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+

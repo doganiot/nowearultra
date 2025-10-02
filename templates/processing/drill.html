@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}Delik Delme - {{ model.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    #canvas-container {
+        width: 100%;
+        height: 500px;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        border-radius: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-dot-circle text-secondary"></i> Delik Delme</h2>
+                    <p class="text-muted mb-0">{{ model.name }}</p>
+                </div>
+                <a href="{% url 'processing:processing_dashboard' model_id=model.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Geri Dön
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="fas fa-sliders-h"></i> Delme Ayarları</h5>
+                </div>
+                <div class="card-body">
+                    <form id="drillForm">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label for="holeDiameter" class="form-label">
+                                <i class="fas fa-ruler"></i> Delik Çapı
+                                <span class="badge bg-secondary ms-2" id="diameterValue">2mm</span>
+                            </label>
+                            <input type="range" class="form-range" id="holeDiameter" min="0.5" max="10" value="2" step="0.5">
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="holeDepth" class="form-label">
+                                <i class="fas fa-arrows-alt-v"></i> Delik Derinliği
+                                <span class="badge bg-secondary ms-2" id="depthValue">5mm</span>
+                            </label>
+                            <input type="range" class="form-range" id="holeDepth" min="1" max="20" value="5" step="1">
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label"><i class="fas fa-map-marker-alt"></i> Delik Konumu</label>
+                            <select class="form-select" id="holePosition">
+                                <option value="center">Merkez</option>
+                                <option value="top">Üst</option>
+                                <option value="side">Yan</option>
+                                <option value="custom">Özel Konum</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label"><i class="fas fa-exchange-alt"></i> Delik Tipi</label>
+                            <select class="form-select" id="holeType">
+                                <option value="through">Delik (Through)</option>
+                                <option value="blind">Kör Delik (Blind)</option>
+                                <option value="countersink">Havşa Delik</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="holeCount" class="form-label">
+                                <i class="fas fa-th"></i> Delik Sayısı: 
+                                <span class="badge bg-secondary ms-2" id="countValue">1</span>
+                            </label>
+                            <input type="range" class="form-range" id="holeCount" min="1" max="10" value="1">
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-secondary btn-lg" id="applyDrill">
+                                <i class="fas fa-circle-notch"></i> Delik Del
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="resetDrill">
+                                <i class="fas fa-undo"></i> Sıfırla
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-eye"></i> Canlı Önizleme</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div id="canvas-container"></div>
+                </div>
+            </div>
+
+            <div class="alert alert-warning mt-3">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Uyarı:</strong> Delik delme işlemi modelin yapısını değiştirir.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+
+<script>
+let scene, camera, renderer, controls, mesh;
+
+function initViewer() {
+    const container = document.getElementById('canvas-container');
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+    camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 10000);
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(renderer.domElement);
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    scene.add(new THREE.DirectionalLight(0xffffff, 0.8).position.set(1, 1, 1));
+    scene.add(new THREE.GridHelper(200, 20, 0x444444, 0x222222));
+
+    const loader = new THREE.STLLoader();
+    loader.load('{{ model.original_file.url }}', function(geometry) {
+        geometry.center();
+        mesh = new THREE.Mesh(geometry, new THREE.MeshPhongMaterial({ color: 0x6c757d, shininess: 200 }));
+        scene.add(mesh);
+        
+        const box = new THREE.Box3().setFromObject(mesh);
+        const center = box.getCenter(new THREE.Vector3());
+        const maxDim = Math.max(...box.getSize(new THREE.Vector3()).toArray());
+        camera.position.set(center.x, center.y, center.z + maxDim * 1.5);
+        camera.lookAt(center);
+        controls.target.copy(center);
+    });
+
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+    }
+    animate();
+}
+
+['holeDiameter', 'holeDepth', 'holeCount'].forEach(id => {
+    document.getElementById(id).addEventListener('input', e => {
+        const value = e.target.value + (id === 'holeCount' ? '' : 'mm');
+        document.getElementById(id.replace('hole', '').replace('Diameter', 'diameter').replace('Depth', 'depth').replace('Count', 'count') + 'Value').textContent = value;
+    });
+});
+
+document.getElementById('applyDrill').addEventListener('click', function() {
+    fetch('{% url "processing:save_step" model_id=model.id %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify({
+            step_type: 'drilling',
+            parameters: {
+                diameter: document.getElementById('holeDiameter').value,
+                depth: document.getElementById('holeDepth').value,
+                position: document.getElementById('holePosition').value,
+                hole_type: document.getElementById('holeType').value,
+                count: document.getElementById('holeCount').value
+            }
+        })
+    }).then(r => r.json()).then(d => {
+        if (d.success) {
+            alert('Delik delme işlemi kaydedildi!');
+            window.location.href = '{% url "processing:processing_dashboard" model_id=model.id %}';
+        }
+    });
+});
+
+initViewer();
+</script>
+{% endblock %}
+

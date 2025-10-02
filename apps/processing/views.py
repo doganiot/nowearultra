@@ -397,6 +397,95 @@ def ovalize_model(request, model_id):
 def drill_hole(request, model_id):
     """Delik delme"""
     model = get_object_or_404(Model3D, id=model_id)
+    
+    if request.method == 'POST':
+        try:
+            from .services import ModelProcessor
+            import time
+            import os
+            from django.core.files import File
+            
+            # Parametreleri al
+            data = json.loads(request.body)
+            diameter = float(data.get('diameter', 2.0))
+            depth = float(data.get('depth', 5.0))
+            position = data.get('position', 'center')
+            hole_type = data.get('hole_type', 'through')
+            count = int(data.get('count', 1))
+            
+            # İşleme başlama zamanı
+            start_time = time.time()
+            
+            # Model işlemcisini başlat
+            processor = ModelProcessor(model.original_file.path)
+            
+            # Delik delme işlemini uygula
+            success = processor.drill_hole(
+                diameter=diameter,
+                depth=depth,
+                position=position,
+                hole_type=hole_type,
+                count=count
+            )
+            
+            if not success:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Delik delme işlemi başarısız oldu'
+                }, status=400)
+            
+            # İşlenmiş modeli kaydet
+            temp_path = processor.save_stl()
+            
+            # ProcessingStep oluştur
+            step = ProcessingStep.objects.create(
+                model=model,
+                step_type='drilling',
+                parameters={
+                    'diameter': diameter,
+                    'depth': depth,
+                    'position': position,
+                    'hole_type': hole_type,
+                    'count': count
+                },
+                execution_time=time.time() - start_time,
+                success=True
+            )
+            
+            # Dosyayı ProcessingStep'e kaydet
+            with open(temp_path, 'rb') as f:
+                step.result_file.save(
+                    f'drill_{model.id}_{step.id}.stl',
+                    File(f),
+                    save=True
+                )
+            
+            # Temp dosyayı sil
+            os.unlink(temp_path)
+            
+            # Orijinal model dosyasını güncelle
+            with open(step.result_file.path, 'rb') as f:
+                model.original_file.save(
+                    model.original_file.name,
+                    File(f),
+                    save=True
+                )
+            
+            messages.success(request, f'Delik delme işlemi başarıyla tamamlandı! ({step.execution_time:.2f} saniye)')
+            
+            return JsonResponse({
+                'success': True,
+                'step_id': str(step.id),
+                'message': 'Delikler başarıyla delindi ve kaydedildi',
+                'redirect_url': f'/processing/{model.id}/'
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+    
     return render(request, 'processing/drill.html', {'model': model})
 
 

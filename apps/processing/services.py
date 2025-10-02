@@ -186,6 +186,113 @@ class ModelProcessor:
             print(f"Ovalleştirme hatası: {e}")
             return False
     
+    def drill_hole(self, diameter=2.0, depth=5.0, position='center', hole_type='through', count=1):
+        """
+        Modele delik del (boolean difference ile)
+        
+        Args:
+            diameter: Delik çapı (mm)
+            depth: Delik derinliği (mm)
+            position: Delik konumu ('center', 'top', 'side', 'custom')
+            hole_type: Delik tipi ('through', 'blind', 'countersink')
+            count: Delik sayısı
+        
+        Returns:
+            bool: Başarılı/başarısız
+        """
+        try:
+            # Model merkezini ve boyutlarını al
+            bounds = self.mesh.bounds
+            center = self.mesh.centroid
+            size = bounds[1] - bounds[0]
+            
+            # Delik pozisyonunu belirle
+            if position == 'center':
+                hole_position = center.copy()
+            elif position == 'top':
+                hole_position = center.copy()
+                hole_position[2] = bounds[1][2] - (depth / 2 if hole_type == 'blind' else 0)
+            elif position == 'side':
+                hole_position = center.copy()
+                hole_position[0] = bounds[1][0] - (depth / 2 if hole_type == 'blind' else 0)
+            else:
+                hole_position = center.copy()
+            
+            # Delik sayısına göre işlem yap
+            for i in range(int(count)):
+                # Delik için silindir oluştur
+                radius = float(diameter) / 2.0
+                
+                # Through hole için modelin tamamını geçecek uzunlukta silindir
+                if hole_type == 'through':
+                    cylinder_height = max(size) * 2  # Modelden daha uzun
+                else:
+                    cylinder_height = float(depth)
+                
+                # Silindir mesh'i oluştur
+                cylinder = trimesh.creation.cylinder(
+                    radius=radius,
+                    height=cylinder_height,
+                    sections=32  # Daha yuvarlak delik için
+                )
+                
+                # Silindir pozisyonunu ayarla
+                if position == 'center' or position == 'top':
+                    # Z ekseni boyunca (yukarıdan aşağıya)
+                    cylinder_pos = hole_position.copy()
+                    if i > 0:
+                        # Çoklu delik için yan yana yerleştir
+                        offset = (i - (count - 1) / 2) * (diameter * 2)
+                        cylinder_pos[0] += offset
+                elif position == 'side':
+                    # X ekseni boyunca (yandan)
+                    cylinder_pos = hole_position.copy()
+                    # Silindiri X eksenine göre döndür
+                    rotation_matrix = trimesh.transformations.rotation_matrix(
+                        np.pi / 2,
+                        [0, 1, 0]
+                    )
+                    cylinder.apply_transform(rotation_matrix)
+                    if i > 0:
+                        offset = (i - (count - 1) / 2) * (diameter * 2)
+                        cylinder_pos[1] += offset
+                
+                # Silindiri konumlandır
+                translation = trimesh.transformations.translation_matrix(cylinder_pos)
+                cylinder.apply_transform(translation)
+                
+                # Boolean difference ile delik del
+                try:
+                    self.mesh = self.mesh.difference(cylinder)
+                except:
+                    # Boolean işlemi başarısız olursa, alternatif yöntem
+                    print(f"Boolean difference başarısız, delik {i+1} atlanıyor")
+                    continue
+                
+                # Countersink için ek koni ekle
+                if hole_type == 'countersink' and i == 0:
+                    cone_radius = radius * 1.5
+                    cone_height = diameter * 0.5
+                    cone = trimesh.creation.cone(
+                        radius=cone_radius,
+                        height=cone_height,
+                        sections=32
+                    )
+                    cone_pos = hole_position.copy()
+                    cone_pos[2] += cylinder_height / 2
+                    cone_translation = trimesh.transformations.translation_matrix(cone_pos)
+                    cone.apply_transform(cone_translation)
+                    try:
+                        self.mesh = self.mesh.difference(cone)
+                    except:
+                        print("Countersink koni eklenemedi")
+            
+            return True
+            
+        except Exception as e:
+            print(f"Delik delme hatası: {e}")
+            return False
+    
     def save_stl(self, output_path=None):
         """
         Modeli STL olarak kaydet

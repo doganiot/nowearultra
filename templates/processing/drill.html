@@ -107,9 +107,20 @@
                 </div>
             </div>
 
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-info-circle"></i>
+                <strong>Delik Delme Nasıl Çalışır?</strong>
+                <ul class="mb-0 mt-2 small">
+                    <li><strong>Through Hole:</strong> Modeli tamamen geçer</li>
+                    <li><strong>Blind Hole:</strong> Belirtilen derinlikte kör delik</li>
+                    <li><strong>Countersink:</strong> Havşa delik (vidalar için)</li>
+                    <li><strong>Boolean Difference:</strong> Silindir çıkarma yöntemi</li>
+                </ul>
+            </div>
+
             <div class="alert alert-warning mt-3">
                 <i class="fas fa-exclamation-triangle"></i>
-                <strong>Uyarı:</strong> Delik delme işlemi modelin yapısını değiştirir.
+                <strong>Uyarı:</strong> Delik delme işlemi modelin yapısını değiştirir. Büyük çaplı delikler mesh bütünlüğünü bozabilir!
             </div>
         </div>
     </div>
@@ -165,25 +176,56 @@ function initViewer() {
     });
 });
 
+// Uygula - GERÇEKten delik del!
 document.getElementById('applyDrill').addEventListener('click', function() {
-    fetch('{% url "processing:save_step" model_id=model.id %}', {
+    const button = this;
+    const originalText = button.innerHTML;
+    
+    const diameter = document.getElementById('holeDiameter').value;
+    const depth = document.getElementById('holeDepth').value;
+    const position = document.getElementById('holePosition').value;
+    const holeType = document.getElementById('holeType').value;
+    const count = document.getElementById('holeCount').value;
+    
+    // Onay iste
+    if (!confirm(`Bu işlem modele gerçekten delik delecek ve orijinal dosyayı değiştirecek.\n\nDelik Özellikleri:\n- Çap: ${diameter}mm\n- Derinlik: ${depth}mm\n- Konum: ${position}\n- Tip: ${holeType}\n- Adet: ${count}\n\nDevam etmek istiyor musunuz?`)) {
+        return;
+    }
+    
+    // Butonu devre dışı bırak
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Delikler deliniyor...';
+    
+    // API'ye gerçek delik delme isteği gönder
+    fetch('{% url "processing:drill_hole" model_id=model.id %}', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
         body: JSON.stringify({
-            step_type: 'drilling',
-            parameters: {
-                diameter: document.getElementById('holeDiameter').value,
-                depth: document.getElementById('holeDepth').value,
-                position: document.getElementById('holePosition').value,
-                hole_type: document.getElementById('holeType').value,
-                count: document.getElementById('holeCount').value
-            }
+            diameter: diameter,
+            depth: depth,
+            position: position,
+            hole_type: holeType,
+            count: count
         })
-    }).then(r => r.json()).then(d => {
-        if (d.success) {
-            alert('Delik delme işlemi kaydedildi!');
-            window.location.href = '{% url "processing:processing_dashboard" model_id=model.id %}';
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`✅ Delik delme işlemi başarıyla tamamlandı!\n\n${count} adet delik delindi.`);
+            window.location.href = data.redirect_url || '{% url "processing:processing_dashboard" model_id=model.id %}';
+        } else {
+            alert('❌ Hata: ' + data.error);
+            button.disabled = false;
+            button.innerHTML = originalText;
         }
+    })
+    .catch(error => {
+        alert('❌ Bir hata oluştu: ' + error);
+        button.disabled = false;
+        button.innerHTML = originalText;
     });
 });
 

@@ -144,7 +144,11 @@ function initViewer() {
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     
     scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-    scene.add(new THREE.DirectionalLight(0xffffff, 0.8).position.set(1, 1, 1));
+    
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(1, 1, 1);
+    scene.add(directionalLight);
+    
     scene.add(new THREE.GridHelper(200, 20, 0x444444, 0x222222));
 
     const loader = new THREE.STLLoader();
